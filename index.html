@@ -359,9 +359,14 @@ const REASONS=[
   {k:'home',t:'راحة بالمنزل',s:'منزل',c:'var(--r2)'},
   {k:'exam',t:'اختبار',s:'اختبار',c:'var(--r3)'},
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
+  {k:'fired',t:'مفصول',s:'مفصول',c:'#3d3d3d',fx:1},
+  {k:'resign',t:'استقالة',s:'استقالة',c:'#5a5a5a',fx:1},
+  {k:'abs',t:'غياب',s:'غياب',c:'#7a3b2e',fx:1},
+  {k:'absc',t:'غياب مستمر',s:'غ.مستمر',c:'#5e2a20',fx:1},
 ];
+const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.2.3';
+const APP_VERSION='1.3.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -410,13 +415,18 @@ function tag(x){const i=info(x.l);return [i.abbr,x.s.reg,x.s.name,i.co?'س'+i.co
 function unitTxt(l){const i=info(l);return [i.abbr,i.co?'السرية '+i.co:'',i.pl?'الفصيل '+i.pl:''].filter(Boolean).join(' · ')}
 function dayGet(l,date){return l.days[date]||{present:null,abs:{}}}
 function dayMk(l){if(!l.days[curDate])l.days[curDate]={present:null,abs:{}};return l.days[curDate]}
+// الحالات الثابتة: تُحفظ على الطالب نفسه (s.fx) وتبقى في المتفرقة كل يوم من تاريخ بدايتها لين تُلغى
+function fxActive(s,date){return (s.fx||[]).find(e=>e.since<=date&&(!e.end||date<e.end))}
+function eff(l,s,date){const f=fxActive(s,date);return f?f.k:dayGet(l,date).abs[s.reg]}
+function dm(d){return d.slice(8,10)+'/'+d.slice(5,7)}
+function noteOf(s,date){const f=fxActive(s,date);return f?((f.note?f.note+' — ':'')+'منذ '+dm(f.since)):''}
 function hasPresent(d){return d.present!==null&&d.present!==undefined&&d.present!==''}
 function calc(n,date=curDate){
   const by={};REASONS.forEach(r=>by[r.k]=0);let total=0,present=0,marked=0,pending=0,units=0;
-  leaves(n).forEach(l=>{const d=dayGet(l,date),t=l.students.length,regs=new Set(l.students.map(s=>s.reg));
-    const v=Object.keys(d.abs).filter(r=>regs.has(r));
+  leaves(n).forEach(l=>{const d=dayGet(l,date),t=l.students.length;
+    const v=l.students.map(s=>eff(l,s,date)).filter(k=>k&&RMAP[k]);
     if(t)units++;if(t&&!hasPresent(d))pending++;
-    total+=t;present+=hasPresent(d)?Number(d.present):t-v.length;marked+=v.length;v.forEach(r=>by[d.abs[r]]++)});
+    total+=t;present+=hasPresent(d)?Number(d.present):t-v.length;marked+=v.length;v.forEach(k=>by[k]++)});
   return {total,present,absent:Math.max(0,total-present),marked,by,pending,units};
 }
 function studentsIn(n){return leaves(n).flatMap(l=>l.students.map(s=>({s,l})))}
@@ -463,12 +473,12 @@ function renderToday(){
 function renderList(){
   const n=scopeN(),q=norm(document.getElementById('search').value),leaf=isLeaf(n);
   let arr=studentsIn(n).filter(({s})=>!q||norm(s.reg).includes(q)||norm(s.name).includes(q));
-  const ab=x=>dayGet(x.l,curDate).abs[x.s.reg];
+  const ab=x=>eff(x.l,x.s,curDate);
   if(filter==='abs')arr=arr.filter(ab);
   arr.sort((a,b)=>(!!ab(b)-!!ab(a))||byReg(a.s,b.s));
   const ul=document.getElementById('stList'),LIM=150;
   if(!arr.length){ul.innerHTML=`<div class="empty">${filter==='abs'&&!q?'لا يوجد متفرقة':'لا توجد نتائج'}</div>`;return}
-  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span></span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
+  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span>${noteOf(x.s,curDate)?`<span class="unit" style="color:var(--warn)">📝 ${esc(noteOf(x.s,curDate))}</span>`:''}</span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
 }
 function reportText(n=scopeN(),date=curDate){
   const k=calc(n,date),leaf=isLeaf(n);
@@ -476,8 +486,8 @@ function reportText(n=scopeN(),date=curDate){
   if(k.absent)t+=REASONS.filter(r=>k.by[r.k]).map(r=>`- ${r.t}: ${k.by[r.k]}`).join('\n')+'\n';
   if(!leaf&&n.children.length){t+='\n*التوزيع*\n'+n.children.map(c=>{const q=calc(c,date);return `${label(c)}: ع ${q.total} | ح ${q.present} | م ${q.absent}`}).join('\n')+'\n'}
   REASONS.forEach(r=>{
-    const list=studentsIn(n).filter(x=>dayGet(x.l,date).abs[x.s.reg]===r.k).sort((a,b)=>byReg(a.s,b.s));
-    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`).join('\n')+'\n';
+    const list=studentsIn(n).filter(x=>eff(x.l,x.s,date)===r.k).sort((a,b)=>byReg(a.s,b.s));
+    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,date)?`\n   📝 ${noteOf(x.s,date)}`:'')).join('\n')+'\n';
   });
   if(k.marked!==k.absent)t+=`\n⚠️ المسجّل سببهم ${k.marked} من ${k.absent}`;
   if(!leaf&&k.pending)t+=`\n⚠️ لم يُدخل الحالي في ${k.pending} من ${k.units} (محسوب من المتفرقة المسجّلة)`;
@@ -525,14 +535,26 @@ function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle(
 function setPresent(v){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n);d.present=v===''?null:Math.max(0,parseInt(digits(v))||0);save();renderToday()}
 let shL=null,shR=null;
 function openSheet(lid,reg){
-  shL=lid;shR=reg;const l=N(lid),s=l.students.find(x=>x.reg===reg),cur=dayGet(l,curDate).abs[reg];
+  shL=lid;shR=reg;const l=N(lid),s=l.students.find(x=>x.reg===reg),cur=dayGet(l,curDate).abs[reg],fx=fxActive(s,curDate);
   document.getElementById('shName').textContent=s.name;
   document.getElementById('shReg').textContent=`رقم التسجيل: ${s.reg} — ${fullLabel(l)}`;
-  document.getElementById('shOpts').innerHTML=REASONS.map(r=>`<button class="opt ${cur===r.k?'on':''}" onclick="pick('${r.k}')"><span class="dot" style="background:${r.c}"></span>${r.t}</button>`).join('')+
-    (cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء المتفرقة)</button>`:'');
+  const ob=(r,on,fn,dis)=>`<button class="opt ${on?'on':''}" ${dis?'disabled style="opacity:.4"':''} onclick="${fn}"><span class="dot" style="background:${r.c}"></span>${r.t}</button>`;
+  document.getElementById('shOpts').innerHTML=
+    (fx?`<div class="note bad" style="text-align:right;margin:0 0 10px">📌 حالة ثابتة: ${RMAP[fx.k].t} — ${esc(noteOf(s,curDate))}</div>`:'')+
+    `<b style="font-size:14px">سبب اليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
+    (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء المتفرقة)</button>`:'')+
+    `<b style="font-size:14px">حالة ثابتة (يبقى في المتفرقة كل يوم)</b><div class="dgrid" style="margin:8px 0 8px">`+RFIX.map(r=>ob(r,fx&&fx.k===r.k,`pickFx('${r.k}')`)).join('')+`</div>`+
+    `<input id="shNote" type="text" placeholder="ملاحظة تظهر عند اسمه (اختياري)" value="${fx?esc(fx.note||''):''}">`+
+    (fx?`<div class="row" style="margin:8px 0 10px"><button class="btn sec" onclick="pickFx('${fx.k}')">حفظ الملاحظة</button><button class="btn dng" onclick="clearFx()">إلغاء الحالة الثابتة</button></div>`:'<div style="height:10px"></div>');
   document.getElementById('sheet').classList.add('on');
 }
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
+function pickFx(k){const l=N(shL),s=l.students.find(x=>x.reg===shR),note=document.getElementById('shNote').value.trim();s.fx=s.fx||[];
+  const a=fxActive(s,curDate);
+  if(a&&a.k===k){a.note=note}else{if(a){if(a.since>=curDate)s.fx.splice(s.fx.indexOf(a),1);else a.end=curDate}s.fx.push({k,since:curDate,note})}
+  const d=l.days[curDate];if(d)delete d.abs[shR];save();closeSheet();renderAll();toast('📌 '+RMAP[k].t+' — ثابت من '+dm(curDate))}
+function clearFx(){const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;
+  ask(`إلغاء «${RMAP[a.k].t}» من ${s.name}؟ (يرجع موجود من تاريخ ${dm(curDate)})`,()=>{if(a.since>=curDate)s.fx.splice(s.fx.indexOf(a),1);else a.end=curDate;save();closeSheet();renderAll();toast('تم الإلغاء')})}
 function pick(k){const d=dayMk(N(shL));if(k)d.abs[shR]=k;else delete d.abs[shR];save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
 
 // التكرار = نفس رقم التسجيل داخل نفس الفصيل فقط. الاسم عادي يتكرر، والرقم عادي يتكرر بين فصيل وفصيل.
@@ -602,31 +624,32 @@ function pgNew(W=PW,H=PH){const cv=document.createElement('canvas');cv.width=W;c
 function T(x,s,px,py,o={}){x.font=`${o.b?'700':'400'} ${o.sz||30}px ${FONT}`;x.fillStyle=o.c||'#000';x.textAlign=o.al||'right';s=String(s);
   if(o.max){while(x.measureText(s).width>o.max&&s.length>1)s=s.slice(0,-2)+'…'}x.fillText(s,px,py)}
 function RR(x,X,Y,W,H,r,fill,stroke,lw=3,dash){x.beginPath();x.roundRect?x.roundRect(X,Y,W,H,r):x.rect(X,Y,W,H);if(fill){x.fillStyle=fill;x.fill()}if(stroke){x.setLineDash(dash||[]);x.lineWidth=lw;x.strokeStyle=stroke;x.stroke();x.setLineDash([])}}
-function sectionPages(head,sub,cols,rows,foot){
-  const out=[],RH=60,inner=PW-2*PM,fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(cl=>{if(!cl.w)cl.w=inner-fixed});
+function sectionPages(head,sub,cols,rows,foot,land){
+  const W=land?PH:PW,H=land?PW:PH;
+  const out=[],RH=60,inner=W-2*PM,fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(cl=>{if(!cl.w)cl.w=inner-fixed});
   let p,y,part=0;
-  const top=()=>{p=pgNew();out.push(p);const x=p.x;
-    T(x,head+(part?'  (تابع)':''),PW-PM,PM+30,{sz:44,b:1,max:inner-340});
-    T(x,sub,PW-PM,PM+86,{sz:25,c:'#555',max:inner});
+  const top=()=>{p=pgNew(W,H);out.push(p);const x=p.x;
+    T(x,head+(part?'  (تابع)':''),W-PM,PM+30,{sz:44,b:1,max:inner-340});
+    T(x,sub,W-PM,PM+86,{sz:25,c:'#555',max:inner});
     RR(x,PM,PM,300,70,14,'#f0f0f0','#000',2);T(x,'↩ الرجوع للملخص',PM+150,PM+35,{sz:27,b:1,al:'center'});
     p.links.push({r:[PM,PM,300,70],to:0});
-    y=PM+140;let cx=PW-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    y=PM+140;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
     cols.forEach(cl=>{T(x,cl.t,cl.al?cx-cl.w/2:cx-12,y+RH/2,{sz:24,b:1,al:cl.al?'center':'right'});cx-=cl.w});y+=RH;part++};
   top();
-  if(!rows.length)T(p.x,'لا يوجد',PW/2,y+80,{sz:32,c:'#777',al:'center'});
+  if(!rows.length)T(p.x,'لا يوجد',W/2,y+80,{sz:32,c:'#777',al:'center'});
   rows.forEach((r,i)=>{
-    if(y+RH>PH-PM-50)top();
+    if(y+RH>H-PM-50)top();
     const x=p.x,arr=Array.isArray(r),cells=arr?r:r.c,fl=arr?null:r.fill,bd=arr?0:r.b;
     if(fl){x.fillStyle=fl;x.fillRect(PM,y,inner,RH)}else if(i%2){x.fillStyle='#f6f6f6';x.fillRect(PM,y,inner,RH)}
-    let cx=PW-PM;cells.forEach((v,j)=>{const cl=cols[j];T(x,v,cl.al?cx-cl.w/2:cx-12,y+RH/2,{sz:25,b:bd,max:cl.w-20,al:cl.al?'center':'right'});cx-=cl.w});
-    x.strokeStyle='#c8c8c8';x.lineWidth=1;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(PW-PM,y+RH);x.stroke();y+=RH});
-  if(foot){if(y+50>PH-PM-50)top();T(p.x,foot,PW-PM,y+36,{sz:22,c:'#555'})}
-  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,PW/2,PH-PM/2,{sz:22,c:'#777',al:'center'}));
+    let cx=W-PM;cells.forEach((v,j)=>{const cl=cols[j];T(x,v,cl.al?cx-cl.w/2:cx-12,y+RH/2,{sz:25,b:bd,max:cl.w-20,al:cl.al?'center':'right'});cx-=cl.w});
+    x.strokeStyle='#c8c8c8';x.lineWidth=1;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(W-PM,y+RH);x.stroke();y+=RH});
+  if(foot){if(y+50>H-PM-50)top();T(p.x,foot,W-PM,y+36,{sz:22,c:'#555'})}
+  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));
   return out;
 }
 function buildReportPages(){
   const n=scopeN(),date=curDate,k=calc(n,date),leaf=isLeaf(n),sub=`${fullLabel(n)} — ${fmtDate(date)}`;
-  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>dayGet(x.l,date).abs[x.s.reg];
+  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>eff(x.l,x.s,date),nt=x=>noteOf(x.s,date);
   const status=x=>ab(x)?RMAP[ab(x)].t:'موجود';
   const pages=[pgNew()],start={};const add=(key,pp)=>{start[key]=pages.length;pages.push(...pp)};
   const hasCo=all.some(x=>info(x.l).co);
@@ -643,12 +666,14 @@ function buildReportPages(){
     n.children.forEach(c=>w(c,1));
     rows.push({c:['المجموع',k.total,k.present,k.absent,...REASONS.map(r=>k.by[r.k])],b:1,fill:'#d6d6d6'});
     const NC=[{t:'العام',w:92,al:1},{t:'الحالي',w:92,al:1},{t:'المتفرقة',w:108,al:1},...REASONS.map(r=>({t:r.s,w:94,al:1}))];
-    add('total',sectionPages('توزيع الموجود',sub,[{t:'الوحدة',w:0},...NC],rows,star?'* لم يُدخل الحالي — محسوب من المتفرقة المسجّلة':''));
+    add('total',sectionPages('توزيع الموجود',sub,[{t:'الوحدة',w:0},...NC],rows,star?'* لم يُدخل الحالي — محسوب من المتفرقة المسجّلة':'',true));
     start.present=start.total;
   }
   const abl=[];REASONS.forEach(r=>all.filter(x=>ab(x)===r.k).forEach(x=>abl.push(x)));
-  add('absent',sectionPages(`المتفرقة (${abl.length})`,sub,cols({t:'السبب',w:215}),abl.map((x,i)=>[...base(x,i),status(x)])));
-  REASONS.forEach(r=>{const l=all.filter(x=>ab(x)===r.k);if(l.length)add(r.k,sectionPages(`${r.t} (${l.length})`,sub,cols(),l.map(base)))});
+  const anyN=abl.some(nt),NT=[{t:'ملاحظة',w:380}];
+  add('absent',sectionPages(`المتفرقة (${abl.length})`,sub,cols({t:'السبب',w:215},...(anyN?NT:[])),abl.map((x,i)=>[...base(x,i),status(x),...(anyN?[nt(x)]:[])]),'',anyN));
+  REASONS.forEach(r=>{const l=all.filter(x=>ab(x)===r.k);if(!l.length)return;const hn=l.some(nt);
+    add(r.k,sectionPages(`${r.t} (${l.length})`,sub,cols(...(hn?NT:[])),l.map((x,i)=>[...base(x,i),...(hn?[nt(x)]:[])]),'',hn))});
 
   const p=pages[0],x=p.x;
   T(x,'تقرير الموجود',PW/2,PM+36,{sz:58,b:1,al:'center'});
@@ -663,13 +688,13 @@ function buildReportPages(){
     T(x,key==='absent'||leaf?'اضغط للأسماء':'اضغط للتوزيع',X+bw/2,by+192,{sz:21,c:'#666',al:'center'});
     p.links.push({r:[X,by,bw,bh],to:start[key]})});
   let y=by+bh+66;T(x,'أسباب المتفرقة',PW-PM,y,{sz:36,b:1});y+=40;
-  const rw=(PW-2*PM-gap)/2,rh=150;
-  REASONS.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),X=PW-PM-(col+1)*rw-col*gap,Y=y+row*(rh+gap),v=k.by[r.k];
-    RR(x,X,Y,rw,rh,20,v?'#fff':'#fafafa',v?'#000':'#aaa',v?3:2,v?null:[10,8]);
-    T(x,r.t,X+rw-28,Y+50,{sz:32,b:1,c:v?'#000':'#888'});T(x,v,X+36,Y+rh/2,{sz:74,b:1,al:'left',c:v?'#000':'#aaa'});
-    T(x,v?'اضغط للأسماء':'لا يوجد',X+rw-28,Y+108,{sz:21,c:'#666'});
+  const rw=(PW-2*PM-gap)/2,rh=104,g2=18,nr=Math.ceil(REASONS.length/2);
+  REASONS.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),X=PW-PM-(col+1)*rw-col*gap,Y=y+row*(rh+g2),v=k.by[r.k];
+    RR(x,X,Y,rw,rh,18,v?(r.fx?'#efefef':'#fff'):'#fafafa',v?'#000':'#aaa',v?3:2,v?null:[10,8]);
+    T(x,r.t+(r.fx?' (ثابت)':''),X+rw-26,Y+38,{sz:29,b:1,c:v?'#000':'#888'});T(x,v,X+34,Y+rh/2,{sz:60,b:1,al:'left',c:v?'#000':'#aaa'});
+    T(x,v?'اضغط للأسماء':'لا يوجد',X+rw-26,Y+78,{sz:20,c:'#666'});
     if(v)p.links.push({r:[X,Y,rw,rh],to:start[r.k]})});
-  y+=2*rh+gap+40;
+  y+=nr*rh+(nr-1)*g2+40;
   const warns=[];if(k.marked!==k.absent)warns.push(`⚠️ المسجّل سببهم ${k.marked} من أصل ${k.absent} متفرقة`);if(!leaf&&k.pending)warns.push(`⚠️ لم يُدخل الحالي في ${k.pending} من ${k.units} — محسوب من المتفرقة المسجّلة`);
   warns.forEach(wm=>{RR(x,PM,y,PW-2*PM,58,12,'#eee','#000',2);T(x,wm,PW/2,y+29,{sz:25,b:1,al:'center'});y+=70});
   if(!leaf&&n.children.length){
