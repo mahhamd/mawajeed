@@ -136,7 +136,6 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 <main>
 <!-- ======= الموجود ======= -->
 <section class="view on" id="v-today">
-  <div class="card" id="courseCard" style="display:flex;align-items:center;gap:10px;padding:10px 14px"><span class="nm" id="courseName" style="font-weight:700"></span><button class="tb" id="courseEdit">✏️ تحرير</button></div>
   <div class="stats">
     <div class="stat"><span>العام</span><b id="sTotal">0</b></div>
     <div class="stat" id="presBox"><span>الحالي</span><input id="sPresent" type="number" inputmode="numeric" oninput="setPresent(this.value)"><b id="sPresentSum" class="sum" style="display:none"></b></div>
@@ -173,6 +172,17 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
       <button class="btn sec" onclick="pdfSave()">حفظ PDF</button>
       <button class="btn sec" onclick="copyReport()">نسخ كنص</button>
       <button class="btn sec" onclick="shareReport()">إرسال كنص</button>
+    </div>
+  </div>
+  <div class="card">
+    <b>📑 تقرير خاص</b>
+    <p class="small">اختر نوع أو أكثر من المتفرقة، ويطلع التقرير بأسمائهم فقط (حسب المستوى المختار بالأعلى).</p>
+    <div class="dgrid" id="specOpts" style="margin:8px 0 10px"></div>
+    <pre class="rep" id="specText" style="max-height:260px;overflow:auto"></pre>
+    <button class="btn full" style="margin-top:10px" onclick="specPdfShare()">📄 إرسال PDF (واتساب)</button>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sec" onclick="specPdfSave()">حفظ PDF</button>
+      <button class="btn sec" onclick="specTextShare()">إرسال كنص</button>
     </div>
   </div>
   <div class="card">
@@ -383,7 +393,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.5.1';
+const APP_VERSION='1.6.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -441,7 +451,7 @@ function diffDays(a,b){return Math.round((new Date(b+'T12:00')-new Date(a+'T12:0
 function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
   if(f.k==='home'&&f.end)t=`راحة ${daysTxt(f.days||diffDays(f.since,f.end))} من ${dm(f.since)} إلى ${dm(addDays(f.end,-1))} — العودة ${dm(f.end)}`;
   else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
-  return (f.note?f.note+' — ':'')+t}
+  return (f.cause?'السبب: '+f.cause+' — ':'')+(f.note?f.note+' — ':'')+t}
 function hasPresent(d){return d.present!==null&&d.present!==undefined&&d.present!==''}
 function calc(n,date=curDate){
   const by={};REASONS.forEach(r=>by[r.k]=0);let total=0,present=0,marked=0,pending=0,units=0;
@@ -467,9 +477,6 @@ function renderAll(){
 }
 function renderToday(){
   const n=scopeN(),k=calc(n),leaf=isLeaf(n);
-  const cc=document.getElementById('courseCard');
-  if(n===ROOT){cc.style.display='';document.getElementById('courseName').innerHTML=S.batches.map(b=>`<span style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">${esc(label(b))} ${b.abbr?`<span class="small">(${esc(b.abbr)})</span>`:''}<button class="tb" onclick="editNode('${b.id}')">✏️ تحرير</button></span>`).join('');document.getElementById('courseEdit').style.display='none'}
-  else{const b=chain(n)[0];cc.style.display='';document.getElementById('courseName').innerHTML=`${esc(label(b))} ${b.abbr?`<span class="small">(${esc(b.abbr)})</span>`:''}`;const e=document.getElementById('courseEdit');e.style.display='';e.onclick=()=>editNode(b.id)}
   document.getElementById('sTotal').textContent=k.total;
   const pi=document.getElementById('sPresent'),ps=document.getElementById('sPresentSum');
   pi.style.display=leaf?'':'none';ps.style.display=leaf?'none':'';
@@ -519,6 +526,7 @@ function reportText(n=scopeN(),date=curDate){
   return t.trim();
 }
 function renderReport(){
+  renderSpec();
   document.getElementById('repText').textContent=reportText();
   const n=scopeN(),ds=new Set();
   leaves(n).forEach(l=>Object.keys(l.days).forEach(d=>{const x=l.days[d];if(hasPresent(x)||Object.keys(x.abs).length)ds.add(d)}));
@@ -580,6 +588,7 @@ function drawSheet(){
       <div class="row"><div><label class="l">تاريخ البداية</label><input id="shSince" type="date" value="${curDate}"></div>
       ${sel.fx==='days'?`<div><label class="l">عدد أيام الراحة</label><input id="shDays" type="number" inputmode="numeric" min="1" value="3" oninput="shPrev()"></div>`:''}</div>
       <p class="small" id="shPrevT" style="margin:6px 0 0"></p>
+      ${shSel==='hosp'||shSel==='home'?`<label class="l">السبب</label><input id="shCause" type="text" placeholder="${shSel==='hosp'?'مثال: عملية زائدة':'مثال: كسر في اليد'}">`:''}
       <label class="l">ملاحظة (اختياري)</label><input id="shNote" type="text" placeholder="مثال: بقرار رقم 45">
       <button class="btn full" style="margin-top:10px" onclick="applyFx()">حفظ</button></div>`}
   h+=`<b style="font-size:14px">لليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
@@ -593,12 +602,12 @@ function shPrev(){const e=document.getElementById('shPrevT');if(!e||!shSel)retur
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
 function applyFx(){
   const l=N(shL),s=l.students.find(x=>x.reg===shR),k=shSel,r=RMAP[k];s.fx=s.fx||[];
-  const since=document.getElementById('shSince').value||curDate,note=document.getElementById('shNote').value.trim();
+  const since=document.getElementById('shSince').value||curDate,note=document.getElementById('shNote').value.trim(),ce=document.getElementById('shCause'),cause=ce?ce.value.trim():'';
   const days=r.fx==='days'?Math.max(1,parseInt(digits(document.getElementById('shDays').value))||1):null;
   // أي حالة سابقة تتقاطع مع البداية الجديدة تنتهي قبلها
   s.fx=s.fx.filter(e=>e.since<since||(e.since>=since&&false));
   s.fx.forEach(e=>{if(!e.end||e.end>since)e.end=since});
-  s.fx.push({k,since,note,days,end:days?addDays(since,days):null});
+  s.fx.push({k,since,note,cause,days,end:days?addDays(since,days):null});
   Object.keys(l.days).forEach(d=>{if(d>=since&&(!days||d<addDays(since,days)))delete l.days[d].abs[shR]});
   save();closeSheet();renderAll();toast(`${r.t} — من ${dm(since)}`+(days?` لمدة ${daysTxt(days)}`:''))}
 function doReturn(){
@@ -794,6 +803,51 @@ async function pdfFile(){
 async function pdfShare(){toast('جاري تجهيز الملف...');try{const f=await pdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function pdfSave(){try{dl(await pdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 function dl(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+
+/* ---------- تقرير خاص ---------- */
+function specSel(){if(!Array.isArray(S.spec))S.spec=['hosp','home','abs'];return S.spec}
+function toggleSpec(k){const a=specSel(),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);save();renderSpec()}
+function specRows(){const n=scopeN(),sel=specSel();const all=studentsIn(n);const out=[];
+  REASONS.filter(r=>sel.includes(r.k)).forEach(r=>all.filter(x=>eff(x.l,x.s,curDate)===r.k).sort((a,b)=>{const A=info(a.l),B=info(b.l);return (A.co-B.co)||(A.pl-B.pl)||byReg(a.s,b.s)}).forEach(x=>out.push({...x,r})));return out}
+function specTitle(){const a=REASONS.filter(r=>specSel().includes(r.k)).map(r=>r.t);return a.length>3?'خاص':a.join(' و ')}
+function specText(){const n=scopeN(),rows=specRows(),sel=REASONS.filter(r=>specSel().includes(r.k));
+  let t=`*تقرير ${specTitle()}*\n${fullLabel(n)}\n${fmtDate(curDate)}\n\n`;
+  t+=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('\n')+`\nالمجموع: ${rows.length}\n`;
+  sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,curDate)?`\n   ${noteOf(x.s,curDate)}`:'')).join('\n')+'\n'});
+  return t.trim()}
+function renderSpec(){const sel=specSel();
+  document.getElementById('specOpts').innerHTML=REASONS.map(r=>`<button class="opt ${sel.includes(r.k)?'on':''}" onclick="toggleSpec('${r.k}')"><span class="dot" style="background:${r.c}"></span>${sel.includes(r.k)?'☑':'☐'} ${r.t}</button>`).join('');
+  document.getElementById('specText').textContent=sel.length?specText():'اختر نوع واحد على الأقل'}
+function specReady(){if(!specSel().length){toast('اختر نوع واحد على الأقل');return false}return true}
+async function specTextShare(){if(!specReady())return;const t=specText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
+function specPages(){
+  const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>noteOf(x.s,curDate));
+  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),{t:'نوع المتفرقة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:640}]:[])];
+  const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
+  const data=rows.map((x,i)=>{const f=info(x.l);return [i+1,f.abbr,x.s.reg,x.s.name,...(hasCo?[f.co,f.pl]:[]),x.r.t,...(anyN?[noteOf(x.s,curDate)]:[])]});
+  const sel=REASONS.filter(r=>specSel().includes(r.k)),sum=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('   ·   ')+`   ·   المجموع: ${rows.length}`;
+  const out=[];let p,x,y,part=0;
+  const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
+    T(x,'تقرير '+specTitle()+(part?' (تابع)':''),W/2,PM+30,{sz:46,b:1,al:'center',max:inner});
+    T(x,`${fullLabel(n)} — ${fmtDate(curDate)}`,W/2,PM+92,{sz:28,al:'center',max:inner});
+    T(x,sum,W/2,PM+140,{sz:26,b:1,c:'#333',al:'center',max:inner});
+    y=PM+180;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-12,y+RH/2,{sz:24,b:1,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
+  top();
+  if(!data.length)T(x,'لا يوجد',W/2,y+80,{sz:32,c:'#777',al:'center'});
+  data.forEach((r,i)=>{if(y+RH>H-PM-60)top();if(i%2){x.fillStyle='#f4f4f4';x.fillRect(PM,y,inner,RH)}
+    let cx=W-PM;r.forEach((v,j)=>{const c=cols[j];T(x,v,c.al?cx-c.w/2:cx-12,y+RH/2,{sz:c.t==='ملاحظة'?21:24,max:c.w-18,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#bbb';x.lineWidth=1;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(W-PM,y+RH);x.stroke();y+=RH});
+  if(y+150>H-PM)top();
+  T(x,'المسؤول: ......................................',W-PM,H-PM-80,{sz:29});T(x,'التوقيع: ......................',PM,H-PM-80,{sz:29,al:'left'});
+  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));
+  return out}
+async function specPdfFile(){if(document.fonts&&document.fonts.ready)await document.fonts.ready;const n=scopeN();
+  const nm=`تقرير-${REASONS.filter(r=>specSel().includes(r.k)).map(r=>r.s).join('-')}-${n===ROOT?'الكل':chain(n).map(shortName).join('-')}-${curDate}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
+  return new File([makePDF(specPages())],nm,{type:'application/pdf'})}
+async function specPdfShare(){if(!specReady())return;try{const f=await specPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
+async function specPdfSave(){if(!specReady())return;try{dl(await specPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 
 /* ---------- زر المتفرقة السريع ---------- */
 function openFab(){document.getElementById('fabSearch').value='';document.getElementById('fabSheet').classList.add('on');renderFab()}
