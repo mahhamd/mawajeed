@@ -383,7 +383,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.5.0';
+const APP_VERSION='1.5.1';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -742,8 +742,8 @@ function buildReportPages(){
   let y=by+bh+66;T(x,'أسباب المتفرقة',PW-PM,y,{sz:36,b:1});y+=40;
   const rw=(PW-2*PM-gap)/2,rh=104,g2=18,nr=Math.ceil(REASONS.length/2);
   REASONS.forEach((r,i)=>{const col=i%2,row=Math.floor(i/2),X=PW-PM-(col+1)*rw-col*gap,Y=y+row*(rh+g2),v=k.by[r.k];
-    RR(x,X,Y,rw,rh,18,v?(r.fx?'#efefef':'#fff'):'#fafafa',v?'#000':'#aaa',v?3:2,v?null:[10,8]);
-    T(x,r.t+(r.fx?' (ثابت)':''),X+rw-26,Y+38,{sz:29,b:1,c:v?'#000':'#888'});T(x,v,X+34,Y+rh/2,{sz:60,b:1,al:'left',c:v?'#000':'#aaa'});
+    RR(x,X,Y,rw,rh,18,v?'#fff':'#fafafa',v?'#000':'#aaa',v?3:2,v?null:[10,8]);
+    T(x,r.t,X+rw-26,Y+38,{sz:29,b:1,c:v?'#000':'#888'});T(x,v,X+34,Y+rh/2,{sz:60,b:1,al:'left',c:v?'#000':'#aaa'});
     T(x,v?'اضغط للأسماء':'لا يوجد',X+rw-26,Y+78,{sz:20,c:'#666'});
     if(v)p.links.push({r:[X,Y,rw,rh],to:start[r.k]})});
   y+=nr*rh+(nr-1)*g2+40;
