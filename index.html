@@ -207,7 +207,7 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
   </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <b>الطلبة</b><span class="small" id="stCount"></span>
+      <b>الطلبة</b><span class="small"><span id="stCount"></span> <button class="tb" style="background:var(--warn2);color:var(--warn);margin-right:6px" onclick="delAllStudents()">حذف الكل</button></span>
     </div>
     <input id="search2" type="text" placeholder="🔍 بحث" style="margin-top:8px" oninput="renderStudents()">
     <ul class="list" id="allList"></ul>
@@ -361,7 +361,7 @@ const REASONS=[
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
 ];
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.2.2';
+const APP_VERSION='1.2.3';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -562,6 +562,8 @@ function bulkAdd(){
   save();renderAll();if(add)document.getElementById('bulk').value='';
   toast(`أضيف ${add} إلى ${l.name}`+(dup?` · مكرر ${dup}`:'')+(bad?` · بدون رقم ${bad}`:''));
 }
+function delAllStudents(){const l=N(stLeaf);if(!l||!isLeaf(l)||!l.students.length)return toast('ما فيه طلبة');
+  ask(`حذف كل طلبة «${fullLabel(l)}» (${l.students.length} طالب) مع مواجيدهم؟`,()=>{snapshot('قبل حذف طلبة '+l.name);l.students=[];Object.values(l.days).forEach(d=>{d.abs={}});save();renderAll();toast('تم الحذف — تقدر تسترجعهم من الإعدادات إذا احتجت')})}
 function delStudent(reg){const l=N(stLeaf),s=l.students.find(x=>x.reg===reg);ask(`حذف ${s.name}؟`,()=>{l.students=l.students.filter(x=>x.reg!==reg);Object.values(l.days).forEach(d=>delete d.abs[reg]);save();renderAll()})}
 
 /* ---------- الهيكل ---------- */
@@ -764,20 +766,31 @@ async function impRead(inp){
   let rows;try{rows=/\.(csv|txt)$/i.test(f.name)?readCsv(await f.text()):await readXlsx(await f.arrayBuffer())}
   catch(e){return toast(e.message==='nods'?'حدّث نظام الجوال لقراءة ملفات الإكسل':'تعذر قراءة الملف')}
   rows=rows.filter(r=>r.some(c=>c));if(!rows.length)return toast('الملف فاضي');
-  // اكتشاف صف العناوين والأعمدة
-  let hdr=-1,map={reg:-1,name:-1,co:-1,pl:-1};
-  for(let i=0;i<Math.min(6,rows.length);i++){const r=rows[i].map(norm);
-    const fi=re=>r.findIndex(c=>re.test(c));
-    const nm=fi(/اسم/),rg=fi(/تسجيل/)>=0?fi(/تسجيل/):fi(/رقم|الرقم/);
-    if(nm>=0||rg>=0){hdr=i;map={reg:rg,name:nm,co:fi(/سري/),pl:fi(/فصي/)};break}}
-  const body=rows.slice(hdr+1),ncol=Math.max(...rows.map(r=>r.length));
-  if(map.reg<0||map.name<0){let bestN=-1,bestT=-1,sn=0,st=0;
-    for(let c=0;c<ncol;c++){const vals=body.slice(0,50).map(r=>r[c]||'');
-      const num=vals.filter(x=>/^\d{3,}$/.test(digits(x))).length,txt=vals.filter(x=>/[؀-ۿ]{2,}\s+[؀-ۿ]{2,}/.test(x)).length;
-      if(num>sn&&map.reg<0){sn=num;bestN=c}if(txt>st){st=txt;bestT=c}}
-    if(map.reg<0)map.reg=bestN;if(map.name<0)map.name=bestT}
-  const heads=[];for(let c=0;c<ncol;c++)heads.push((hdr>=0&&rows[hdr][c])||('عمود '+String.fromCharCode(65+c%26)));
-  IMP={rows:body,map,heads,batchId:document.getElementById('impBatch').value,leaf:null,file:f.name};
+  // اكتشاف صف العناوين: نختار الصف اللي فيه أكثر عناوين قصيرة معروفة (مو سطر عنوان الكشف الطويل)
+  const KW={name:/اسم/,reg:/تسجيل|سجل|عسكري|رقم/,ser:/^م$|^م\.|مسلسل|تسلسل|^الرقم$|^رقم$/,co:/سري/,pl:/فصي/};
+  let hdr=-1,best=0;
+  for(let i=0;i<Math.min(12,rows.length);i++){const cells=rows[i].map(norm).filter(c=>c&&c.length<=25);
+    const sc=Object.keys(KW).filter(k=>cells.some(c=>KW[k].test(c))).length;if(sc>best){best=sc;hdr=i}}
+  const ncol=Math.max(...rows.map(r=>r.length)),body=rows.slice(hdr+1);
+  const colVals=c=>body.map(r=>digits(r[c]||'').trim()).filter(Boolean);
+  const isSerial=c=>{const v=colVals(c).filter(x=>/^\d+$/.test(x)).map(Number);if(v.length<3)return false;
+    let ok=0;for(let i=1;i<v.length;i++)if(v[i]===v[i-1]+1||v[i]===1)ok++;return ok/(v.length-1)>0.7&&Math.max(...v)<2000&&!colVals(c).some(x=>/^0\d/.test(x))};
+  const numScore=c=>colVals(c).filter(x=>/^[\d\-\/]{2,}$/.test(x)).length;
+  const H=hdr>=0?rows[hdr].map(x=>norm(x)):[];
+  const fh=re=>H.findIndex(c=>c&&c.length<=25&&re.test(c));
+  let map={reg:fh(/تسجيل|سجل|عسكري/),name:fh(/اسم/),co:fh(/سري/),pl:fh(/فصي/)};
+  if(map.reg<0){const r=fh(/رقم/);if(r>=0&&!KW.ser.test(H[r])&&!isSerial(r))map.reg=r}
+  if(map.reg>=0&&isSerial(map.reg))map.reg=-1;
+  if(map.reg<0){let bs=0;for(let c=0;c<ncol;c++){if(c===map.name||c===map.co||c===map.pl||isSerial(c))continue;const sc=numScore(c);if(sc>bs){bs=sc;map.reg=c}}}
+  if(map.name<0){let bs=0;for(let c=0;c<ncol;c++){const sc=body.slice(0,80).filter(r=>/[؀-ۿ]{2,}\s+[؀-ۿ]{2,}/.test(r[c]||'')).length;if(sc>bs){bs=sc;map.name=c}}}
+  // تخمين الدفعة من عنوان الملف
+  let batchId=document.getElementById('impBatch').value;
+  const top=norm(rows.slice(0,Math.max(1,hdr+1)).flat().join(' ')+' '+f.name);
+  const pickB=re=>S.batches.find(b=>re.test(norm(b.name)));
+  const gb=/رقبا|ط\.ض\.ص/.test(top)?pickB(/رقبا/):/حارس|اغرار|ح\.و\.ت\.د/.test(top)?pickB(/اغرار|حارس/):null;
+  if(gb)batchId=gb.id;
+  const heads=[];for(let c=0;c<ncol;c++){const h=(hdr>=0&&rows[hdr][c])||('عمود '+String.fromCharCode(65+c%26));const ex=body.map(r=>r[c]).find(Boolean);heads.push(h+(ex?` (مثال: ${String(ex).slice(0,18)})`:''))}
+  IMP={rows:body,map,heads,batchId,leaf:null,file:f.name};
   impRender();document.getElementById('confirm').classList.add('on');
 }
 function impCompute(){
@@ -798,7 +811,8 @@ function impRender(){
   const b=N(IMP.batchId),m=IMP.map,opt=k=>`<select onchange="IMP.map.${k}=+this.value;impRender()"><option value="-1">— لا يوجد —</option>${IMP.heads.map((h,i)=>`<option value="${i}" ${m[k]===i?'selected':''}>${esc(h)}</option>`).join('')}</select>`;
   if(b.children.length&&(m.co<0||m.pl<0)&&!IMP.leaf)IMP.leaf=leaves(b)[0].id;
   const c=impCompute();
-  let h=`<p class="small">${esc(IMP.file)} — ${IMP.rows.length} صف · الدفعة: ${esc(label(b))}</p>
+  let h=`<p class="small">${esc(IMP.file)} — ${IMP.rows.length} صف</p>
+  <label class="l">الدفعة</label><select onchange="IMP.batchId=this.value;IMP.leaf=null;impRender()">${S.batches.map(x=>`<option value="${x.id}" ${x.id===IMP.batchId?'selected':''}>${esc(label(x))}</option>`).join('')}</select>
   <div class="row"><div><label class="l">عمود رقم التسجيل</label>${opt('reg')}</div><div><label class="l">عمود الاسم</label>${opt('name')}</div></div>`;
   if(c.split)h+=`<div class="row"><div><label class="l">عمود السرية</label>${opt('co')}</div><div><label class="l">عمود الفصيل</label>${opt('pl')}</div></div>`+
     (c.byCols?'':`<label class="l">ما فيه أعمدة سرية وفصيل — أضفهم كلهم إلى:</label><select onchange="IMP.leaf=this.value;impRender()">${leaves(b).map(l=>`<option value="${l.id}" ${IMP.leaf===l.id?'selected':''}>${esc(relLabel(l,b))}</option>`).join('')}</select>`);
