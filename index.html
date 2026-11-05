@@ -361,7 +361,7 @@ const REASONS=[
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
 ];
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.2.0';
+const APP_VERSION='1.2.1';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -535,12 +535,14 @@ function openSheet(lid,reg){
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
 function pick(k){const d=dayMk(N(shL));if(k)d.abs[shR]=k;else delete d.abs[shR];save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
 
-function regExists(reg){return S.batches.flatMap(leaves).find(l=>l.students.some(s=>s.reg===reg))}
+// رقم التسجيل فقط هو اللي يُفحص للتكرار (داخل نفس الدفعة). الاسم عادي يتكرر.
+function regExists(reg,batch){return leaves(batch).find(l=>l.students.some(s=>s.reg===reg))}
+function findReg(reg,batch){for(const l of leaves(batch)){const st=l.students.find(s=>s.reg===reg);if(st)return {l,s:st}}return null}
 function addStudent(){
   const l=N(stLeaf);if(!l||!isLeaf(l))return toast('اختر الفصيل أولاً');
   const reg=digits(document.getElementById('addReg').value).trim(),name=document.getElementById('addName').value.trim();
   if(!reg||!name)return toast('اكتب الرقم والاسم');
-  const ex=regExists(reg);if(ex)return toast('الرقم موجود في: '+fullLabel(ex));
+  const ex=findReg(reg,chain(l)[0]);if(ex)return toast(`رقم ${reg} موجود مسبقاً: ${ex.s.name} — ${fullLabel(ex.l)}`);
   l.students.push({reg,name});save();
   document.getElementById('addReg').value='';document.getElementById('addName').value='';document.getElementById('addReg').focus();
   renderAll();toast('تمت الإضافة');
@@ -554,7 +556,7 @@ function bulkAdd(){
     else if((m=x.match(/^(.+?)[\s\t\-–,،:]+(\d+)$/))){reg=m[2];name=m[1]}
     else{bad++;return}
     name=name.replace(/[\t,،]+/g,' ').replace(/\s+/g,' ').trim();
-    if(regExists(reg)){dup++;return}
+    if(regExists(reg,chain(l)[0])){dup++;return}
     l.students.push({reg,name});add++;
   });
   save();renderAll();if(add)document.getElementById('bulk').value='';
@@ -776,15 +778,16 @@ async function impRead(inp){
 }
 function impCompute(){
   const b=N(IMP.batchId),m=IMP.map,split=b.children.length>0,byCols=split&&m.co>=0&&m.pl>=0;
-  const seen=new Set(),add=[],dist=new Map();let dup=0,bad=0,noUnit=0;
+  const seen=new Map(),add=[],dist=new Map(),dups=[];let dup=0,bad=0,noUnit=0;
   IMP.rows.forEach(r=>{const reg=digits(r[m.reg]||'').replace(/\s/g,''),name=(r[m.name]||'').replace(/\s+/g,' ').trim();
     if(!reg||!name||!/\d/.test(reg)){bad++;return}
-    if(seen.has(reg)||regExists(reg)){dup++;return}
+    if(seen.has(reg)){dup++;dups.push({reg,name,why:'مكرر في الملف مع: '+seen.get(reg)});return}
+    const ex=findReg(reg,b);if(ex){dup++;dups.push({reg,name,why:'موجود مسبقاً: '+ex.s.name});return}
     let leaf;if(!split)leaf=b;else if(byCols){const co=unitNum(r[m.co]),pl=unitNum(r[m.pl]),c=b.children[co-1],l=c&&c.children[pl-1];leaf=l||(c&&!c.children.length?c:null)}
     else leaf=IMP.leaf?N(IMP.leaf):null;
     if(!leaf){noUnit++;return}
-    seen.add(reg);add.push({leaf,reg,name});dist.set(leaf,(dist.get(leaf)||0)+1)});
-  return {add,dup,bad,noUnit,dist,byCols,split};
+    seen.set(reg,name);add.push({leaf,reg,name});dist.set(leaf,(dist.get(leaf)||0)+1)});
+  return {add,dup,bad,noUnit,dist,byCols,split,dups};
 }
 function impRender(){
   const b=N(IMP.batchId),m=IMP.map,opt=k=>`<select onchange="IMP.map.${k}=+this.value;impRender()"><option value="-1">— لا يوجد —</option>${IMP.heads.map((h,i)=>`<option value="${i}" ${m[k]===i?'selected':''}>${esc(h)}</option>`).join('')}</select>`;
@@ -797,6 +800,7 @@ function impRender(){
   h+=`<div class="card" style="margin:12px 0 0;background:#fafaf8"><b>سيتم إضافة ${c.add.length} طالب</b>`+
     (c.split&&c.dist.size?`<div class="small" style="margin-top:6px;line-height:1.8">${[...c.dist].map(([l,n])=>`${esc(relLabel(l,b))}: ${n}`).join('<br>')}</div>`:'')+
     `<div class="small" style="margin-top:6px">${c.dup?`مكرر/موجود مسبقاً: ${c.dup} · `:''}${c.bad?`صفوف ناقصة: ${c.bad} · `:''}${c.noUnit?`<span style="color:var(--warn)">سرية/فصيل غير معروف: ${c.noUnit}</span>`:''}</div>`+
+    (c.dups.length?`<div class="small" style="margin-top:8px;color:var(--warn);line-height:1.8"><b>أرقام تسجيل مكررة (ما بتنضاف):</b><br>${c.dups.slice(0,15).map(d=>esc(`${d.reg} ${d.name} ← ${d.why}`)).join('<br>')}${c.dups.length>15?`<br>و${c.dups.length-15} غيرهم`:''}</div>`:'')+
     (c.add.length?`<div class="small" style="margin-top:8px">مثال: ${c.add.slice(0,3).map(x=>esc(x.reg+' '+x.name)).join(' ، ')}</div>`:'')+`</div>`;
   document.getElementById('cfMsg').textContent='استيراد الأسماء';document.getElementById('cfBody').innerHTML=h;
   const y=document.getElementById('cfYes');y.textContent=`إضافة ${c.add.length}`;
