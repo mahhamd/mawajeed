@@ -361,7 +361,7 @@ const REASONS=[
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
 ];
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.2.1';
+const APP_VERSION='1.2.2';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -535,14 +535,14 @@ function openSheet(lid,reg){
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
 function pick(k){const d=dayMk(N(shL));if(k)d.abs[shR]=k;else delete d.abs[shR];save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
 
-// رقم التسجيل فقط هو اللي يُفحص للتكرار (داخل نفس الدفعة). الاسم عادي يتكرر.
-function regExists(reg,batch){return leaves(batch).find(l=>l.students.some(s=>s.reg===reg))}
-function findReg(reg,batch){for(const l of leaves(batch)){const st=l.students.find(s=>s.reg===reg);if(st)return {l,s:st}}return null}
+// التكرار = نفس رقم التسجيل داخل نفس الفصيل فقط. الاسم عادي يتكرر، والرقم عادي يتكرر بين فصيل وفصيل.
+function regExists(reg,leaf){return leaf.students.some(s=>s.reg===reg)}
+function findReg(reg,leaf){const st=leaf.students.find(s=>s.reg===reg);return st?{l:leaf,s:st}:null}
 function addStudent(){
   const l=N(stLeaf);if(!l||!isLeaf(l))return toast('اختر الفصيل أولاً');
   const reg=digits(document.getElementById('addReg').value).trim(),name=document.getElementById('addName').value.trim();
   if(!reg||!name)return toast('اكتب الرقم والاسم');
-  const ex=findReg(reg,chain(l)[0]);if(ex)return toast(`رقم ${reg} موجود مسبقاً: ${ex.s.name} — ${fullLabel(ex.l)}`);
+  const ex=findReg(reg,l);if(ex)return toast(`رقم ${reg} موجود مسبقاً في هذا الفصيل: ${ex.s.name}`);
   l.students.push({reg,name});save();
   document.getElementById('addReg').value='';document.getElementById('addName').value='';document.getElementById('addReg').focus();
   renderAll();toast('تمت الإضافة');
@@ -556,7 +556,7 @@ function bulkAdd(){
     else if((m=x.match(/^(.+?)[\s\t\-–,،:]+(\d+)$/))){reg=m[2];name=m[1]}
     else{bad++;return}
     name=name.replace(/[\t,،]+/g,' ').replace(/\s+/g,' ').trim();
-    if(regExists(reg,chain(l)[0])){dup++;return}
+    if(regExists(reg,l)){dup++;return}
     l.students.push({reg,name});add++;
   });
   save();renderAll();if(add)document.getElementById('bulk').value='';
@@ -740,12 +740,16 @@ async function readXlsx(buf){
     const first=tags(wb,'sheet')[0],rid=first&&(first.getAttribute('r:id')||first.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id'));
     const rel=tags(rels,'Relationship').find(r=>r.getAttribute('Id')===rid);
     if(rel){let t=rel.getAttribute('Target');t=t.startsWith('/')?t.slice(1):'xl/'+t.replace(/^\.\//,'');sheet=t}}catch(e){}
+  const pad={};try{const st=xml(await get('xl/styles.xml')),fm={};tags(st,'numFmt').forEach(n=>fm[n.getAttribute('numFmtId')]=n.getAttribute('formatCode')||'');
+    const cx=tags(st,'cellXfs')[0];if(cx)tags(cx,'xf').forEach((x,i)=>{const code=(fm[x.getAttribute('numFmtId')]||'').replace(/["\\]/g,'');const m=code.match(/^0+$/);if(m&&code.length>1)pad[i]=code.length})}catch(e){}
   const ssT=await get('xl/sharedStrings.xml'),ss=ssT?tags(xml(ssT),'si').map(si=>tags(si,'t').map(t=>t.textContent).join('')):[];
   const sh=xml(await get(sheet)),rows=[];
   tags(sh,'row').forEach(r=>{const out=[];tags(r,'c').forEach(c=>{const ref=c.getAttribute('r')||'',col=(ref.match(/[A-Z]+/)||['A'])[0];let ci=0;for(const ch of col)ci=ci*26+ch.charCodeAt(0)-64;ci--;
     const t=c.getAttribute('t'),vv=tags(c,'v')[0];let val='';
     if(t==='s')val=ss[+(vv&&vv.textContent)]||'';else if(t==='inlineStr')val=tags(c,'t').map(x=>x.textContent).join('');else val=vv?vv.textContent:'';
-    if(/^\d+\.0+$/.test(val))val=val.replace(/\.0+$/,'');out[ci]=String(val).trim()});
+    if(/^\d+\.0+$/.test(val))val=val.replace(/\.0+$/,'');
+    const sx=c.getAttribute('s');if(t!=='s'&&t!=='inlineStr'&&t!=='str'&&sx&&pad[sx]&&/^\d+$/.test(val))val=val.padStart(pad[sx],'0');
+    out[ci]=String(val).trim()});
     rows.push(Array.from(out,x=>x||''))});
   return rows;
 }
@@ -781,12 +785,13 @@ function impCompute(){
   const seen=new Map(),add=[],dist=new Map(),dups=[];let dup=0,bad=0,noUnit=0;
   IMP.rows.forEach(r=>{const reg=digits(r[m.reg]||'').replace(/\s/g,''),name=(r[m.name]||'').replace(/\s+/g,' ').trim();
     if(!reg||!name||!/\d/.test(reg)){bad++;return}
-    if(seen.has(reg)){dup++;dups.push({reg,name,why:'مكرر في الملف مع: '+seen.get(reg)});return}
-    const ex=findReg(reg,b);if(ex){dup++;dups.push({reg,name,why:'موجود مسبقاً: '+ex.s.name});return}
     let leaf;if(!split)leaf=b;else if(byCols){const co=unitNum(r[m.co]),pl=unitNum(r[m.pl]),c=b.children[co-1],l=c&&c.children[pl-1];leaf=l||(c&&!c.children.length?c:null)}
     else leaf=IMP.leaf?N(IMP.leaf):null;
     if(!leaf){noUnit++;return}
-    seen.set(reg,name);add.push({leaf,reg,name});dist.set(leaf,(dist.get(leaf)||0)+1)});
+    const key=leaf.id+'|'+reg;
+    if(seen.has(key)){dup++;dups.push({reg,name,why:'مكرر في نفس الفصيل مع: '+seen.get(key)});return}
+    const ex=findReg(reg,leaf);if(ex){dup++;dups.push({reg,name,why:'موجود مسبقاً: '+ex.s.name});return}
+    seen.set(key,name);add.push({leaf,reg,name});dist.set(leaf,(dist.get(leaf)||0)+1)});
   return {add,dup,bad,noUnit,dist,byCols,split,dups};
 }
 function impRender(){
@@ -846,9 +851,9 @@ function renderDetSearch(){
   const d=DT(),ul=document.getElementById('detRes');if(!d){ul.innerHTML='';return}
   const q=norm(document.getElementById('detSearch').value);if(!q){ul.innerHTML='';return}
   const b=IDX[d.batchId]?N(d.batchId):null;if(!b){ul.innerHTML='';return}
-  const have=new Set(d.items.map(i=>i.reg));
+  const have=new Set(d.items.map(i=>i.leafId+'|'+i.reg));
   const arr=studentsIn(b).filter(({s})=>norm(s.reg).includes(q)||norm(s.name).includes(q)).sort((a,c)=>byReg(a.s,c.s)).slice(0,30);
-  ul.innerHTML=arr.length?arr.map(x=>have.has(x.s.reg)?`<li style="opacity:.5;cursor:default"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}</span><span class="small">مضاف ✓</span></li>`:
+  ul.innerHTML=arr.length?arr.map(x=>have.has(x.l.id+'|'+x.s.reg)?`<li style="opacity:.5;cursor:default"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}</span><span class="small">مضاف ✓</span></li>`:
     `<li onclick="addDetItem('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span></span><span class="tb">+ إضافة</span></li>`).join(''):'<div class="empty">لا توجد نتائج في هذه الدورة</div>';
 }
 function addDetItem(lid,reg){const d=DT(),l=N(lid),st=l.students.find(s=>s.reg===reg);
