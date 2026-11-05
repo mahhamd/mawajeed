@@ -110,6 +110,9 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 .chip.dr{background:#4a4f4c}
 .chip.none{background:#fff;color:var(--warn);border:1px dashed var(--warn)}
 .seg.wrap button{font-size:13px;line-height:1.3}
+#fab{position:fixed;left:16px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:8;border:none;border-radius:28px;background:var(--pri);color:#fff;font-weight:700;font-size:16px;padding:14px 20px;box-shadow:0 4px 14px #0004}
+#fab.hide{display:none}
+.tb.ret{background:var(--pri);color:#fff}
 .more{text-align:center;font-size:13px;color:var(--muted);padding:10px}
 </style>
 </head>
@@ -350,23 +353,36 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
   </div>
 </div>
 
+<button id="fab" onclick="openFab()">＋ متفرقة</button>
+<div class="sheet-bg" id="fabSheet" onclick="if(event.target===this)closeFab()">
+  <div class="sheet">
+    <h3>المتفرقة</h3>
+    <div class="sub" id="fabSub"></div>
+    <input id="fabSearch" type="text" placeholder="🔍 أضف طالب: ابحث بالرقم أو الاسم" oninput="renderFab()">
+    <ul class="list" id="fabRes" style="margin-top:6px"></ul>
+    <b style="font-size:15px;display:block;margin-top:14px">المتفرقة المستمرة اليوم</b>
+    <ul class="list" id="fabList"></ul>
+    <button class="btn sec full" style="margin-top:12px" onclick="closeFab()">إغلاق</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <div id="upd"><b>🔄 يوجد تحديث جديد للبرنامج</b><button onclick="applyUpdate()">تحديث الآن</button></div>
 
 <script>
 const REASONS=[
-  {k:'hosp',t:'دخول المستشفى',s:'مستشفى',c:'var(--r1)'},
-  {k:'home',t:'راحة بالمنزل',s:'منزل',c:'var(--r2)'},
+  {k:'hosp',t:'دخول المستشفى',s:'مستشفى',c:'var(--r1)',fx:'open'},
+  {k:'home',t:'راحة بالمنزل',s:'منزل',c:'var(--r2)',fx:'days'},
   {k:'exam',t:'اختبار',s:'اختبار',c:'var(--r3)'},
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
-  {k:'fired',t:'مفصول',s:'مفصول',c:'#3d3d3d',fx:1},
-  {k:'resign',t:'استقالة',s:'استقالة',c:'#5a5a5a',fx:1},
-  {k:'abs',t:'غياب',s:'غياب',c:'#7a3b2e',fx:1},
-  {k:'absc',t:'غياب مستمر',s:'غ.مستمر',c:'#5e2a20',fx:1},
+  {k:'abs',t:'غياب',s:'غياب',c:'#7a3b2e',fx:'open'},
+  {k:'absc',t:'غياب مستمر',s:'غ.مستمر',c:'#5e2a20',fx:'open'},
+  {k:'fired',t:'مفصول',s:'مفصول',c:'#3d3d3d',fx:'perm'},
+  {k:'resign',t:'استقالة',s:'استقالة',c:'#5a5a5a',fx:'perm'},
 ];
+// day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/استقالة
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.4.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -419,7 +435,12 @@ function dayMk(l){if(!l.days[curDate])l.days[curDate]={present:null,abs:{}};retu
 function fxActive(s,date){return (s.fx||[]).find(e=>e.since<=date&&(!e.end||date<e.end))}
 function eff(l,s,date){const f=fxActive(s,date);return f?f.k:dayGet(l,date).abs[s.reg]}
 function dm(d){return d.slice(8,10)+'/'+d.slice(5,7)}
-function noteOf(s,date){const f=fxActive(s,date);return f?((f.note?f.note+' — ':'')+'منذ '+dm(f.since)):''}
+function addDays(d,n){const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)}
+function diffDays(a,b){return Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5)}
+function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
+  if(f.k==='home'&&f.end)t=`راحة ${daysTxt(f.days||diffDays(f.since,f.end))} من ${dm(f.since)} إلى ${dm(addDays(f.end,-1))} — العودة ${dm(f.end)}`;
+  else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
+  return (f.note?f.note+' — ':'')+t}
 function hasPresent(d){return d.present!==null&&d.present!==undefined&&d.present!==''}
 function calc(n,date=curDate){
   const by={};REASONS.forEach(r=>by[r.k]=0);let total=0,present=0,marked=0,pending=0,units=0;
@@ -528,33 +549,60 @@ function renderSettings(){
 }
 
 /* ---------- الأحداث ---------- */
-function go(v){view=v;document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='report')renderReport();if(v==='det')renderDet();window.scrollTo(0,0)}
+function go(v){view=v;document.getElementById('fab').classList.toggle('hide',v!=='today');document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='report')renderReport();if(v==='det')renderDet();window.scrollTo(0,0)}
 function setScope(id){S.scope=IDX[id]?id:'all';const n=scopeN();if(isLeaf(n))stLeaf=n.id;save();document.getElementById('search').value='';renderAll();window.scrollTo(0,0)}
 function setDate(d){curDate=d||today();renderAll()}
 function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle('on',f==='all');document.getElementById('fAbs').classList.toggle('on',f==='abs');renderList()}
 function setPresent(v){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n);d.present=v===''?null:Math.max(0,parseInt(digits(v))||0);save();renderToday()}
 let shL=null,shR=null;
+let shSel=null;
 function openSheet(lid,reg){
-  shL=lid;shR=reg;const l=N(lid),s=l.students.find(x=>x.reg===reg),cur=dayGet(l,curDate).abs[reg],fx=fxActive(s,curDate);
-  document.getElementById('shName').textContent=s.name;
-  document.getElementById('shReg').textContent=`رقم التسجيل: ${s.reg} — ${fullLabel(l)}`;
-  const ob=(r,on,fn,dis)=>`<button class="opt ${on?'on':''}" ${dis?'disabled style="opacity:.4"':''} onclick="${fn}"><span class="dot" style="background:${r.c}"></span>${r.t}</button>`;
-  document.getElementById('shOpts').innerHTML=
-    (fx?`<div class="note bad" style="text-align:right;margin:0 0 10px">📌 حالة ثابتة: ${RMAP[fx.k].t} — ${esc(noteOf(s,curDate))}</div>`:'')+
-    `<b style="font-size:14px">سبب اليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
-    (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء المتفرقة)</button>`:'')+
-    `<b style="font-size:14px">حالة ثابتة (يبقى في المتفرقة كل يوم)</b><div class="dgrid" style="margin:8px 0 8px">`+RFIX.map(r=>ob(r,fx&&fx.k===r.k,`pickFx('${r.k}')`)).join('')+`</div>`+
-    `<input id="shNote" type="text" placeholder="ملاحظة تظهر عند اسمه (اختياري)" value="${fx?esc(fx.note||''):''}">`+
-    (fx?`<div class="row" style="margin:8px 0 10px"><button class="btn sec" onclick="pickFx('${fx.k}')">حفظ الملاحظة</button><button class="btn dng" onclick="clearFx()">إلغاء الحالة الثابتة</button></div>`:'<div style="height:10px"></div>');
-  document.getElementById('sheet').classList.add('on');
+  shL=lid;shR=reg;shSel=null;document.getElementById('sheet').classList.add('on');drawSheet();
 }
+function drawSheet(){
+  const l=N(shL),s=l.students.find(x=>x.reg===shR),cur=dayGet(l,curDate).abs[shR],fx=fxActive(s,curDate);
+  document.getElementById('shName').textContent=s.name;
+  document.getElementById('shReg').textContent=`رقم التسجيل: ${s.reg} — ${unitTxt(l)}`;
+  const ob=(r,on,fn,dis)=>`<button class="opt ${on?'on':''}" ${dis?'disabled style="opacity:.4"':''} onclick="${fn}"><span class="dot" style="background:${r.c}"></span>${r.t}</button>`;
+  const sel=shSel?RMAP[shSel]:null;let h='';
+  if(fx){const r=RMAP[fx.k];h+=`<div class="card" style="background:var(--warn2);border-color:#f0cdc3;margin:0 0 12px">
+      <b style="color:var(--warn)">● ${r.t}</b><div class="small" style="margin:4px 0 10px">${esc(noteOf(s,curDate))}</div>
+      ${r.fx==='perm'?`<button class="btn dng full" onclick="doReturn()">إلغاء ${r.t}</button>`:
+      `<label class="l" style="margin-top:0">تاريخ العودة</label><input id="shRet" type="date" value="${curDate}">
+       <button class="btn full" style="margin-top:8px" onclick="doReturn()">✅ عودة</button>`}</div>`}
+  h+=`<b style="font-size:14px">متفرقة مستمرة</b><div class="dgrid" style="margin:8px 0 10px">`+RFIX.map(r=>ob(r,shSel===r.k||(!shSel&&fx&&fx.k===r.k),`shSel='${r.k}';drawSheet()`)).join('')+`</div>`;
+  if(sel){h+=`<div class="card" style="margin:0 0 12px;background:#fafaf8">
+      <b>${sel.t}</b><span class="small"> — ${sel.fx==='days'?'يرجع موجود تلقائي بعد انتهاء الأيام':sel.fx==='open'?'يبقى في المتفرقة لين تضغط «عودة»':'يبقى في المتفرقة لين تلغيه'}</span>
+      <div class="row"><div><label class="l">تاريخ البداية</label><input id="shSince" type="date" value="${curDate}"></div>
+      ${sel.fx==='days'?`<div><label class="l">عدد أيام الراحة</label><input id="shDays" type="number" inputmode="numeric" min="1" value="3" oninput="shPrev()"></div>`:''}</div>
+      <p class="small" id="shPrevT" style="margin:6px 0 0"></p>
+      <label class="l">ملاحظة (اختياري)</label><input id="shNote" type="text" placeholder="مثال: بقرار رقم 45">
+      <button class="btn full" style="margin-top:10px" onclick="applyFx()">حفظ</button></div>`}
+  h+=`<b style="font-size:14px">لليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
+    (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء متفرقة اليوم)</button>`:'');
+  document.getElementById('shOpts').innerHTML=h;
+  if(sel){document.getElementById('shSince').addEventListener('input',shPrev);shPrev()}
+}
+function shPrev(){const e=document.getElementById('shPrevT');if(!e||!shSel)return;const since=document.getElementById('shSince').value||curDate;
+  if(RMAP[shSel].fx==='days'){const n=Math.max(1,parseInt(digits(document.getElementById('shDays').value))||1);e.textContent=`من ${dm(since)} إلى ${dm(addDays(since,n-1))} — العودة ${fmtDate(addDays(since,n))}`}
+  else e.textContent=`يبدأ من ${fmtDate(since)}`}
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
-function pickFx(k){const l=N(shL),s=l.students.find(x=>x.reg===shR),note=document.getElementById('shNote').value.trim();s.fx=s.fx||[];
-  const a=fxActive(s,curDate);
-  if(a&&a.k===k){a.note=note}else{if(a){if(a.since>=curDate)s.fx.splice(s.fx.indexOf(a),1);else a.end=curDate}s.fx.push({k,since:curDate,note})}
-  const d=l.days[curDate];if(d)delete d.abs[shR];save();closeSheet();renderAll();toast('📌 '+RMAP[k].t+' — ثابت من '+dm(curDate))}
-function clearFx(){const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;
-  ask(`إلغاء «${RMAP[a.k].t}» من ${s.name}؟ (يرجع موجود من تاريخ ${dm(curDate)})`,()=>{if(a.since>=curDate)s.fx.splice(s.fx.indexOf(a),1);else a.end=curDate;save();closeSheet();renderAll();toast('تم الإلغاء')})}
+function applyFx(){
+  const l=N(shL),s=l.students.find(x=>x.reg===shR),k=shSel,r=RMAP[k];s.fx=s.fx||[];
+  const since=document.getElementById('shSince').value||curDate,note=document.getElementById('shNote').value.trim();
+  const days=r.fx==='days'?Math.max(1,parseInt(digits(document.getElementById('shDays').value))||1):null;
+  // أي حالة سابقة تتقاطع مع البداية الجديدة تنتهي قبلها
+  s.fx=s.fx.filter(e=>e.since<since||(e.since>=since&&false));
+  s.fx.forEach(e=>{if(!e.end||e.end>since)e.end=since});
+  s.fx.push({k,since,note,days,end:days?addDays(since,days):null});
+  Object.keys(l.days).forEach(d=>{if(d>=since&&(!days||d<addDays(since,days)))delete l.days[d].abs[shR]});
+  save();closeSheet();renderAll();toast(`${r.t} — من ${dm(since)}`+(days?` لمدة ${daysTxt(days)}`:''))}
+function doReturn(){
+  const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;const r=RMAP[a.k];
+  const ret=(document.getElementById('shRet')||{}).value||curDate;
+  const go=()=>{if(ret<=a.since)s.fx.splice(s.fx.indexOf(a),1);else a.end=ret;save();closeSheet();renderAll();closeFab&&renderFab();toast(r.fx==='perm'?'تم الإلغاء':`✅ عودة ${s.name} — ${dm(ret)}`)};
+  if(r.fx==='perm')ask(`إلغاء «${r.t}» من ${s.name}؟`,go);else go()}
+function quickReturn(lid,reg){shL=lid;shR=reg;doReturn()}
 function pick(k){const d=dayMk(N(shL));if(k)d.abs[shR]=k;else delete d.abs[shR];save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
 
 // التكرار = نفس رقم التسجيل داخل نفس الفصيل فقط. الاسم عادي يتكرر، والرقم عادي يتكرر بين فصيل وفصيل.
@@ -742,6 +790,19 @@ async function pdfFile(){
 async function pdfShare(){toast('جاري تجهيز الملف...');try{const f=await pdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function pdfSave(){try{dl(await pdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 function dl(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+
+/* ---------- زر المتفرقة السريع ---------- */
+function openFab(){document.getElementById('fabSearch').value='';document.getElementById('fabSheet').classList.add('on');renderFab()}
+function closeFab(){document.getElementById('fabSheet').classList.remove('on')}
+function renderFab(){
+  const n=scopeN();document.getElementById('fabSub').textContent=`${fullLabel(n)} — ${fmtDate(curDate)}`;
+  const q=norm(document.getElementById('fabSearch').value),all=studentsIn(n);
+  document.getElementById('fabRes').innerHTML=q?(all.filter(({s})=>norm(s.reg).includes(q)||norm(s.name).includes(q)).slice(0,25).map(x=>{const k=eff(x.l,x.s,curDate);
+    return `<li onclick="closeFab();openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span></span>${k?`<span class="chip" style="background:${RMAP[k].c}">${RMAP[k].t}</span>`:'<span class="tb">+ متفرقة</span>'}</li>`}).join('')||'<div class="empty">لا توجد نتائج</div>'):'';
+  const act=all.map(x=>({...x,f:fxActive(x.s,curDate)})).filter(x=>x.f).sort((a,b)=>REASONS.indexOf(RMAP[a.f.k])-REASONS.indexOf(RMAP[b.f.k])||byReg(a.s,b.s));
+  document.getElementById('fabList').innerHTML=act.length?act.map(x=>{const r=RMAP[x.f.k];
+    return `<li><span class="nm" onclick="closeFab();openSheet('${x.l.id}','${esc(x.s.reg)}')">${esc(x.s.name)} <span class="small">${esc(x.s.reg)}</span><span class="unit">${esc(noteOf(x.s,curDate))}</span></span><span class="chip" style="background:${r.c}">${r.t}</span>${r.fx==='open'||r.fx==='days'?`<button class="tb ret" onclick="quickReturn('${x.l.id}','${esc(x.s.reg)}')">عودة</button>`:''}</li>`}).join(''):'<div class="empty">لا يوجد</div>';
+}
 
 /* ---------- استيراد إكسل (محلي بالكامل) ---------- */
 async function unzip(buf){
