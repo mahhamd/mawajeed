@@ -376,13 +376,13 @@ const REASONS=[
   {k:'ext', t:'مراجعة خارجية',s:'مراجعة',c:'var(--r4)'},
   {k:'abs',t:'غياب',s:'غياب',c:'#7a3b2e',fx:'open'},
   {k:'absc',t:'غياب مستمر',s:'غ.مستمر',c:'#5e2a20',fx:'open'},
-  {k:'fired',t:'مفصول',s:'مفصول',c:'#3d3d3d',fx:'perm'},
-  {k:'resign',t:'استقالة',s:'استقالة',c:'#5a5a5a',fx:'perm'},
+  {k:'fired',t:'فصل',s:'فصل',c:'#3d3d3d',fx:'perm'},
+  {k:'resign',t:'اعتذار',s:'اعتذار',c:'#5a5a5a',fx:'perm'},
 ];
-// day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/استقالة
+// day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.4.0';
+const APP_VERSION='1.4.2';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -434,7 +434,7 @@ function dayMk(l){if(!l.days[curDate])l.days[curDate]={present:null,abs:{}};retu
 // الحالات الثابتة: تُحفظ على الطالب نفسه (s.fx) وتبقى في المتفرقة كل يوم من تاريخ بدايتها لين تُلغى
 function fxActive(s,date){return (s.fx||[]).find(e=>e.since<=date&&(!e.end||date<e.end))}
 function eff(l,s,date){const f=fxActive(s,date);return f?f.k:dayGet(l,date).abs[s.reg]}
-function dm(d){return d.slice(8,10)+'/'+d.slice(5,7)}
+function dm(d){return d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4)}
 function addDays(d,n){const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)}
 function diffDays(a,b){return Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5)}
 function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
@@ -499,7 +499,7 @@ function renderList(){
   arr.sort((a,b)=>(!!ab(b)-!!ab(a))||byReg(a.s,b.s));
   const ul=document.getElementById('stList'),LIM=150;
   if(!arr.length){ul.innerHTML=`<div class="empty">${filter==='abs'&&!q?'لا يوجد متفرقة':'لا توجد نتائج'}</div>`;return}
-  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span>${noteOf(x.s,curDate)?`<span class="unit" style="color:var(--warn)">📝 ${esc(noteOf(x.s,curDate))}</span>`:''}</span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
+  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span>${noteOf(x.s,curDate)?`<span class="unit" style="color:var(--warn)">${esc(noteOf(x.s,curDate))}</span>`:''}</span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
 }
 function reportText(n=scopeN(),date=curDate){
   const k=calc(n,date),leaf=isLeaf(n);
@@ -508,7 +508,7 @@ function reportText(n=scopeN(),date=curDate){
   if(!leaf&&n.children.length){t+='\n*التوزيع*\n'+n.children.map(c=>{const q=calc(c,date);return `${label(c)}: ع ${q.total} | ح ${q.present} | م ${q.absent}`}).join('\n')+'\n'}
   REASONS.forEach(r=>{
     const list=studentsIn(n).filter(x=>eff(x.l,x.s,date)===r.k).sort((a,b)=>byReg(a.s,b.s));
-    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,date)?`\n   📝 ${noteOf(x.s,date)}`:'')).join('\n')+'\n';
+    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,date)?`\n   ${noteOf(x.s,date)}`:'')).join('\n')+'\n';
   });
   if(k.marked!==k.absent)t+=`\n⚠️ المسجّل سببهم ${k.marked} من ${k.absent}`;
   if(!leaf&&k.pending)t+=`\n⚠️ لم يُدخل الحالي في ${k.pending} من ${k.units} (محسوب من المتفرقة المسجّلة)`;
