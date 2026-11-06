@@ -113,6 +113,10 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 #fab{position:fixed;left:16px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:8;border:none;border-radius:28px;background:var(--pri);color:#fff;font-weight:700;font-size:16px;padding:14px 20px;box-shadow:0 4px 14px #0004}
 #fab.hide{display:none}
 .tb.ret{background:var(--pri);color:#fff}
+.pres{display:flex;align-items:center;gap:2px}
+.pres button{border:none;background:var(--pri2);color:var(--pri);border-radius:8px;width:26px;height:32px;font-size:12px;flex:0 0 auto;padding:0}
+.pres button:active{background:var(--pri);color:#fff}
+.pres input{min-width:0}
 .more{text-align:center;font-size:13px;color:var(--muted);padding:10px}
 </style>
 </head>
@@ -138,7 +142,7 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 <section class="view on" id="v-today">
   <div class="stats">
     <div class="stat"><span>العام</span><b id="sTotal">0</b></div>
-    <div class="stat" id="presBox"><span>الحالي</span><input id="sPresent" type="number" inputmode="numeric" oninput="setPresent(this.value)"><b id="sPresentSum" class="sum" style="display:none"></b></div>
+    <div class="stat" id="presBox"><span>الحالي</span><div class="pres"><button id="pDn" onclick="bumpPresent(-1)" aria-label="إنقاص">▼</button><input id="sPresent" type="number" inputmode="numeric" oninput="setPresent(this.value)"><button id="pUp" onclick="bumpPresent(1)" aria-label="زيادة">▲</button></div><b id="sPresentSum" class="sum" style="display:none"></b></div>
     <div class="stat hl"><span>المتفرقة</span><b id="sAbsent">0</b></div>
   </div>
   <div class="reasons" id="reasonSum"></div>
@@ -393,7 +397,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.6.0';
+const APP_VERSION='1.6.1';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -479,7 +483,7 @@ function renderToday(){
   const n=scopeN(),k=calc(n),leaf=isLeaf(n);
   document.getElementById('sTotal').textContent=k.total;
   const pi=document.getElementById('sPresent'),ps=document.getElementById('sPresentSum');
-  pi.style.display=leaf?'':'none';ps.style.display=leaf?'none':'';
+  pi.parentNode.style.display=leaf?'':'none';ps.style.display=leaf?'none':'';
   if(leaf){const d=dayGet(n,curDate);if(document.activeElement!==pi)pi.value=hasPresent(d)?d.present:'';pi.placeholder=k.total-k.marked}
   else ps.textContent=k.present;
   document.getElementById('sAbsent').textContent=k.absent;
@@ -565,6 +569,10 @@ function go(v){view=v;document.getElementById('fab').classList.toggle('hide',v!=
 function setScope(id){S.scope=IDX[id]?id:'all';const n=scopeN();if(isLeaf(n))stLeaf=n.id;save();document.getElementById('search').value='';renderAll();window.scrollTo(0,0)}
 function setDate(d){curDate=d||today();renderAll()}
 function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle('on',f==='all');document.getElementById('fAbs').classList.toggle('on',f==='abs');renderList()}
+// إذا تغيّرت حالة طالب (متفرقة/عودة) يتعدّل «الحالي» المكتوب يدوياً في كل يوم تأثر
+function absSnap(l,s){return Object.keys(l.days).filter(d=>hasPresent(l.days[d])).map(d=>[d,!!eff(l,s,d)])}
+function fixPresent(l,s,snap){let ch=0;snap.forEach(([d,b])=>{const a=!!eff(l,s,d),x=l.days[d];if(x&&hasPresent(x)&&a!==b){x.present=Math.max(0,Math.min(l.students.length,Number(x.present)+(b?1:-1)));ch++}});return ch}
+function bumpPresent(delta){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n),k=calc(n);const base=hasPresent(d)?Number(d.present):k.present;d.present=Math.max(0,Math.min(k.total,base+delta));save();renderToday()}
 function setPresent(v){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n);d.present=v===''?null:Math.max(0,parseInt(digits(v))||0);save();renderToday()}
 let shL=null,shR=null;
 let shSel=null;
@@ -601,7 +609,7 @@ function shPrev(){const e=document.getElementById('shPrevT');if(!e||!shSel)retur
   else e.textContent=`يبدأ من ${fmtDate(since)}`}
 function closeSheet(){document.getElementById('sheet').classList.remove('on')}
 function applyFx(){
-  const l=N(shL),s=l.students.find(x=>x.reg===shR),k=shSel,r=RMAP[k];s.fx=s.fx||[];
+  const l=N(shL),s=l.students.find(x=>x.reg===shR),k=shSel,r=RMAP[k];s.fx=s.fx||[];const snap=absSnap(l,s);
   const since=document.getElementById('shSince').value||curDate,note=document.getElementById('shNote').value.trim(),ce=document.getElementById('shCause'),cause=ce?ce.value.trim():'';
   const days=r.fx==='days'?Math.max(1,parseInt(digits(document.getElementById('shDays').value))||1):null;
   // أي حالة سابقة تتقاطع مع البداية الجديدة تنتهي قبلها
@@ -609,14 +617,14 @@ function applyFx(){
   s.fx.forEach(e=>{if(!e.end||e.end>since)e.end=since});
   s.fx.push({k,since,note,cause,days,end:days?addDays(since,days):null});
   Object.keys(l.days).forEach(d=>{if(d>=since&&(!days||d<addDays(since,days)))delete l.days[d].abs[shR]});
-  save();closeSheet();renderAll();toast(`${r.t} — من ${dm(since)}`+(days?` لمدة ${daysTxt(days)}`:''))}
+  fixPresent(l,s,snap);save();closeSheet();renderAll();toast(`${r.t} — من ${dm(since)}`+(days?` لمدة ${daysTxt(days)}`:''))}
 function doReturn(){
   const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;const r=RMAP[a.k];
   const ret=(document.getElementById('shRet')||{}).value||curDate;
-  const go=()=>{if(ret<=a.since)s.fx.splice(s.fx.indexOf(a),1);else a.end=ret;save();closeSheet();renderAll();closeFab&&renderFab();toast(r.fx==='perm'?'تم الإلغاء':`✅ عودة ${s.name} — ${dm(ret)}`)};
+  const go=()=>{const snap=absSnap(l,s);if(ret<=a.since)s.fx.splice(s.fx.indexOf(a),1);else a.end=ret;fixPresent(l,s,snap);save();closeSheet();renderAll();closeFab&&renderFab();toast(r.fx==='perm'?'تم الإلغاء':`✅ عودة ${s.name} — ${dm(ret)}`)};
   if(r.fx==='perm')ask(`إلغاء «${r.t}» من ${s.name}؟`,go);else go()}
 function quickReturn(lid,reg){shL=lid;shR=reg;doReturn()}
-function pick(k){const d=dayMk(N(shL));if(k)d.abs[shR]=k;else delete d.abs[shR];save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
+function pick(k){const l=N(shL),s=l.students.find(x=>x.reg===shR),snap=absSnap(l,s),d=dayMk(l);if(k)d.abs[shR]=k;else delete d.abs[shR];fixPresent(l,s,snap);save();closeSheet();renderToday();toast(k?RMAP[k].t:'تم إلغاء المتفرقة')}
 
 // التكرار = نفس رقم التسجيل داخل نفس الفصيل فقط. الاسم عادي يتكرر، والرقم عادي يتكرر بين فصيل وفصيل.
 function regExists(reg,leaf){return leaf.students.some(s=>s.reg===reg)}
