@@ -455,11 +455,12 @@ const REASONS=[
   {k:'absc',t:'غياب مستمر',s:'غ.مستمر',c:'#5e2a20',fx:'open'},
   {k:'fired',t:'فصل',s:'فصل',c:'#3d3d3d',fx:'perm'},
   {k:'resign',t:'اعتذار',s:'اعتذار',c:'#5a5a5a',fx:'perm'},
+  {k:'nj',t:'لم يلتحق',s:'لم يلتحق',c:'#7a7a7a',fx:'perm'},
 ];
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.10.0';
+const APP_VERSION='1.11.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -468,7 +469,7 @@ let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
 function today(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function digits(s){return String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d))}
-function norm(s){return digits(s).replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[ً-ْ]/g,'').toLowerCase().trim()}
+function norm(s){return digits(s).replace(/\u0640/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[ً-ْ]/g,'').toLowerCase().trim()}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1900)}
 function fmtDate(d){try{return new Date(d+'T12:00').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',{weekday:'long',year:'numeric',month:'2-digit',day:'2-digit'})}catch(e){return d}}
@@ -520,6 +521,7 @@ function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
   if(due){const n=f.days||diffDays(f.since,due);t=(f.k==='home'?'راحة ':f.k==='ext'?'مراجعة ':'مدة متوقعة ')+`${daysTxt(n)} من ${dm(f.since)} إلى ${dm(addDays(due,-1))} — العودة ${dm(due)}`+(late?' (انتهت المدة)':'')}
   else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
   return (f.cause?'السبب: '+f.cause+' — ':'')+(f.note?f.note+' — ':'')+t}
+function fullNote(s,date){return [s.memo,noteOf(s,date)].filter(Boolean).join(' — ')}
 function hasPresent(d){return d.present!==null&&d.present!==undefined&&d.present!==''}
 function calc(n,date=curDate){
   const by={};REASONS.forEach(r=>by[r.k]=0);let total=0,present=0,marked=0,pending=0,units=0;
@@ -578,7 +580,7 @@ function renderList(){
   arr.sort((a,b)=>(!!ab(b)-!!ab(a))||byReg(a.s,b.s));
   const ul=document.getElementById('stList'),LIM=150;
   if(!arr.length){ul.innerHTML=`<div class="empty">${filter==='abs'&&!q?'لا يوجد متفرقة':'لا توجد نتائج'}</div>`;return}
-  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span>${noteOf(x.s,curDate)?`<span class="unit" style="color:var(--warn)">${esc(noteOf(x.s,curDate))}</span>`:''}</span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
+  ul.innerHTML=arr.slice(0,LIM).map(x=>{const r=RMAP[ab(x)];return `<li onclick="openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span>${fullNote(x.s,curDate)?`<span class="unit" style="color:var(--warn)">${esc(fullNote(x.s,curDate))}</span>`:''}</span>${r?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</li>`}).join('')+(arr.length>LIM?`<div class="more">يظهر ${LIM} من ${arr.length} — اكتب في البحث للوصول للباقي</div>`:'');
 }
 function reportText(n=scopeN(),date=curDate){
   const k=calc(n,date),leaf=isLeaf(n);
@@ -587,7 +589,7 @@ function reportText(n=scopeN(),date=curDate){
   if(!leaf&&n.children.length){t+='\n*التوزيع*\n'+n.children.map(c=>{const q=calc(c,date);return `${label(c)}: ع ${q.total} | ح ${q.present} | م ${q.absent}`}).join('\n')+'\n'}
   REASONS.forEach(r=>{
     const list=studentsIn(n).filter(x=>eff(x.l,x.s,date)===r.k).sort((a,b)=>byReg(a.s,b.s));
-    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,date)?`\n   ${noteOf(x.s,date)}`:'')).join('\n')+'\n';
+    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(fullNote(x.s,date)?`\n   ${fullNote(x.s,date)}`:'')).join('\n')+'\n';
   });
   if(k.marked!==k.absent)t+=`\n⚠️ المسجّل سببهم ${k.marked} من ${k.absent}`;
   if(!leaf&&k.pending)t+=`\n⚠️ لم يُدخل الحالي في ${k.pending} من ${k.units} (محسوب من المتفرقة المسجّلة)`;
@@ -612,7 +614,7 @@ function renderStudents(){
   const q=norm(document.getElementById('search2').value);
   document.getElementById('stCount').textContent=l.students.length+' طالب';
   const arr=l.students.filter(s=>!q||norm(s.reg).includes(q)||norm(s.name).includes(q)).sort(byReg);
-  ul.innerHTML=arr.length?arr.map(s=>`<li style="cursor:default"><span class="reg">${esc(s.reg)}</span><span class="nm">${esc(s.name)}</span><button class="del" onclick="delStudent('${esc(s.reg)}')">×</button></li>`).join(''):'<div class="empty">لا يوجد طلبة في هذه الوحدة</div>';
+  ul.innerHTML=arr.length?arr.map(s=>`<li style="cursor:default"><span class="reg">${esc(s.reg)}</span><span class="nm">${esc(s.name)}${s.memo?`<span class="unit">${esc(s.memo)}</span>`:''}</span><button class="del" onclick="delStudent('${esc(s.reg)}')">×</button></li>`).join(''):'<div class="empty">لا يوجد طلبة في هذه الوحدة</div>';
 }
 function renderSettings(){
   const row=(n,d)=>{const cnt=studentsIn(n).length,canSplit=!n.students.length&&d<3;
@@ -631,7 +633,7 @@ function renderSettings(){
 
 /* ---------- الأحداث ---------- */
 function go(v){view=v;document.getElementById('fab').classList.toggle('hide',v!=='today');document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='report')renderReport();if(v==='kashf')renderKashf();if(v==='det')renderDet();window.scrollTo(0,0)}
-function setScope(id){S.scope=IDX[id]?id:'all';const n=scopeN();if(isLeaf(n))stLeaf=n.id;save();document.getElementById('search').value='';renderAll();window.scrollTo(0,0)}
+function setScope(id){S.scope=IDX[id]?id:'all';const n=scopeN();if(isLeaf(n)){stLeaf=n.id;kLeaf=n.id}save();document.getElementById('search').value='';renderAll();window.scrollTo(0,0)}
 function setDate(d){curDate=d||today();renderAll()}
 function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle('on',f==='all');document.getElementById('fAbs').classList.toggle('on',f==='abs');renderList()}
 // إذا تغيّرت حالة طالب (متفرقة/عودة) يتعدّل «الحالي» المكتوب يدوياً في كل يوم تأثر
@@ -667,9 +669,11 @@ function drawSheet(){
       <button class="btn full" style="margin-top:10px" onclick="applyFx()">حفظ</button></div>`}
   h+=`<b style="font-size:14px">لليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
     (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء متفرقة اليوم)</button>`:'');
+  h+=`<label class="l">ملاحظة دائمة عند اسمه (مثل: موسيقى، يعمل شركة)</label><div class="row"><input id="shMemo" type="text" value="${esc(s.memo||'')}" placeholder="بدون"><button class="btn sec" style="flex:0 0 auto" onclick="saveMemo()">حفظ</button></div><div style="height:10px"></div>`;
   document.getElementById('shOpts').innerHTML=h;
   if(sel){document.getElementById('shSince').addEventListener('input',shPrev);shPrev()}
 }
+function saveMemo(){const l=N(shL),s=l.students.find(x=>x.reg===shR),v=document.getElementById('shMemo').value.trim();if(v)s.memo=v;else delete s.memo;save();closeSheet();renderAll();toast('تم حفظ الملاحظة ✓')}
 function shPrev(){const e=document.getElementById('shPrevT');if(!e||!shSel)return;const since=document.getElementById('shSince').value||curDate;
   const dv=document.getElementById('shDays'),nn=dv?parseInt(digits(dv.value)):0;
   if(RMAP[shSel].fx==='days'||nn>0){const n=Math.max(1,nn||1);e.textContent=`من ${dm(since)} إلى ${dm(addDays(since,n-1))} — العودة المتوقعة ${fmtDate(addDays(since,n))} (يطلع لك تنبيه)`}
@@ -803,7 +807,7 @@ function sectionPages(head,sub,cols,rows,foot,land){
 }
 function buildReportPages(){
   const n=scopeN(),date=curDate,k=calc(n,date),leaf=isLeaf(n),sub=`${fullLabel(n)} — ${fmtDate(date)}`;
-  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>eff(x.l,x.s,date),nt=x=>noteOf(x.s,date);
+  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>eff(x.l,x.s,date),nt=x=>fullNote(x.s,date);
   const status=x=>ab(x)?RMAP[ab(x)].t:'موجود';
   const pages=[pgNew()],start={};const add=(key,pp)=>{start[key]=pages.length;pages.push(...pp)};
   const hasCo=all.some(x=>info(x.l).co);
@@ -913,7 +917,7 @@ function renderKashf(){
   document.getElementById('kProg').textContent=`تم تحضير ${done} من ${l.students.length}`;
   const q=norm(document.getElementById('kSearch').value);
   const arr=[...l.students].sort(byReg).filter(s=>!q||norm(s.reg).includes(q)||norm(s.name).includes(q));
-  document.getElementById('kList').innerHTML=arr.length?arr.map(s=>{const t=kState(l,s),e=eff(l,s,curDate),r=e&&RMAP[e],nt=noteOf(s,curDate),R_=esc(s.reg);
+  document.getElementById('kList').innerHTML=arr.length?arr.map(s=>{const t=kState(l,s),e=eff(l,s,curDate),r=e&&RMAP[e],nt=fullNote(s,curDate),R_=esc(s.reg);
     return `<li class="kr"><div class="top"><span class="reg">${R_}</span><span class="nm">${esc(s.name)}${nt?`<span class="unit" style="color:var(--warn)">${esc(nt)}</span>`:''}</span>${r&&t==='o'?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</div>
       <div class="kseg"><button class="p ${t==='p'?'on':''}" onclick="kPresent('${l.id}','${R_}')">حاضر</button><button class="a ${t==='a'?'on':''}" onclick="kAbsent('${l.id}','${R_}')">غياب</button><button class="o ${t==='o'?'on':''}" onclick="openSheet('${l.id}','${R_}')">متفرقة</button></div></li>`}).join(''):'<div class="empty">لا يوجد طلبة في هذا الفصيل</div>';
 }
@@ -928,14 +932,14 @@ function kAllPresent(){const l=kL();if(!l)return;const d=dayMk(l);d.ok=d.ok||{};
 function kStatusTxt(l,s){const e=eff(l,s,curDate);return e?RMAP[e].t:(kState(l,s)==='p'?'حاضر':'—')}
 function kText(){const l=kL(),k=calc(l),hl=kHeadLines(l);
   let t=`*كشف تحضير*\n${hl.join('\n')}\n${fmtDate(curDate)}\n\nالعام: ${k.total}\nالحالي: ${k.present}\nالمتفرقة: ${k.absent}\n\n`;
-  t+=[...l.students].sort(byReg).map((s,i)=>{const nt=noteOf(s,curDate);return `${i+1}- ${s.reg} ${s.name} — ${kStatusTxt(l,s)}`+(nt?`\n   ${nt}`:'')}).join('\n');return t}
+  t+=[...l.students].sort(byReg).map((s,i)=>{const nt=fullNote(s,curDate);return `${i+1}- ${s.reg} ${s.name} — ${kStatusTxt(l,s)}`+(nt?`\n   ${nt}`:'')}).join('\n');return t}
 async function kTextShare(){const t=kText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
 function kPages(){
-  const l=kL(),k=calc(l),hl=kHeadLines(l),st=[...l.students].sort(byReg),f=info(l),anyN=st.some(s=>noteOf(s,curDate)),land=anyN;
+  const l=kL(),k=calc(l),hl=kHeadLines(l),st=[...l.students].sort(byReg),f=info(l),anyN=st.some(s=>fullNote(s,curDate)),land=anyN;
   const W=land?PH:PW,H=land?PW:PH,inner=W-2*PM,RH=56;
   const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},{t:'الحالة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:560}]:[])];
   const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
-  const data=st.map((s,i)=>[i+1,f.abbr,s.reg,s.name,kStatusTxt(l,s),...(anyN?[noteOf(s,curDate)]:[])]);
+  const data=st.map((s,i)=>[i+1,f.abbr,s.reg,s.name,kStatusTxt(l,s),...(anyN?[fullNote(s,curDate)]:[])]);
   const out=[];let p,x,y,part=0;
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;let yy=PM+28;
     T(x,'كشف تحضير'+(part?' (تابع)':''),W/2,yy,{sz:48,b:1,al:'center'});yy+=62;
@@ -968,7 +972,7 @@ function specTitle(){const a=REASONS.filter(r=>specSel().includes(r.k)).map(r=>r
 function specText(){const n=scopeN(),rows=specRows(),sel=REASONS.filter(r=>specSel().includes(r.k));
   let t=`*تقرير ${specTitle()}*\n${fullLabel(n)}\n${fmtDate(curDate)}\n\n`;
   t+=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('\n')+`\nالمجموع: ${rows.length}\n`;
-  sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,curDate)?`\n   ${noteOf(x.s,curDate)}`:'')).join('\n')+'\n'});
+  sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(fullNote(x.s,curDate)?`\n   ${fullNote(x.s,curDate)}`:'')).join('\n')+'\n'});
   return t.trim()}
 function specMode(){return S.specMode==='gen'?'gen':'cur'}
 function setSpecMode(m){S.specMode=m;save();renderSpec()}
@@ -983,7 +987,7 @@ function episodes(){const n=scopeN(),sel=specSel(),[from,to]=specRange(),t=today
     e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1));
     e.endTxt=e.daily?dm(e.since):e.end?dm(e.last):(e.due?`مستمرة (العودة المتوقعة ${dm(e.due)})`:'مستمرة');
     e.stTxt=e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية';
-    e.info=[e.cause?'السبب: '+e.cause:'',e.note].filter(Boolean).join(' — ')});
+    e.info=[e.s.memo,e.cause?'السبب: '+e.cause:'',e.note].filter(Boolean).join(' — ')});
   return out.sort((a,b)=>REASONS.indexOf(RMAP[a.k])-REASONS.indexOf(RMAP[b.k])||(b.active-a.active)||a.since.localeCompare(b.since)||byReg(a.s,b.s))}
 function genText(){const n=scopeN(),E=episodes(),[from,to]=specRange(),sel=REASONS.filter(r=>specSel().includes(r.k));
   let t=`*تقرير ${specTitle()} — المتفرقة العامة*\n${fullLabel(n)}\nمن ${dm(from)} إلى ${dm(to)}\n\n`;
@@ -1032,10 +1036,10 @@ function renderSpec(){const sel=specSel(),gen=specMode()==='gen';
 function specReady(){if(!specSel().length){toast('اختر نوع واحد على الأقل');return false}return true}
 async function specTextShare(){if(!specReady())return;const t=specMode()==='gen'?genText():specText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
 function specPages(){
-  const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>noteOf(x.s,curDate));
+  const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>fullNote(x.s,curDate));
   const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),{t:'نوع المتفرقة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:640}]:[])];
   const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
-  const data=rows.map((x,i)=>{const f=info(x.l);return [i+1,f.abbr,x.s.reg,x.s.name,...(hasCo?[f.co,f.pl]:[]),x.r.t,...(anyN?[noteOf(x.s,curDate)]:[])]});
+  const data=rows.map((x,i)=>{const f=info(x.l);return [i+1,f.abbr,x.s.reg,x.s.name,...(hasCo?[f.co,f.pl]:[]),x.r.t,...(anyN?[fullNote(x.s,curDate)]:[])]});
   const sel=REASONS.filter(r=>specSel().includes(r.k)),sum=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('   ·   ')+`   ·   المجموع: ${rows.length}`;
   const out=[];let p,x,y,part=0;
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
@@ -1071,7 +1075,7 @@ function renderFab(){
     return `<li onclick="closeFab();openSheet('${x.l.id}','${esc(x.s.reg)}')"><span class="reg">${esc(x.s.reg)}</span><span class="nm">${esc(x.s.name)}<span class="unit">${esc(unitTxt(x.l))}</span></span>${k?`<span class="chip" style="background:${RMAP[k].c}">${RMAP[k].t}</span>`:'<span class="tb">+ متفرقة</span>'}</li>`}).join('')||'<div class="empty">لا توجد نتائج</div>'):'';
   const act=all.map(x=>({...x,f:fxActive(x.s,curDate)})).filter(x=>x.f).sort((a,b)=>REASONS.indexOf(RMAP[a.f.k])-REASONS.indexOf(RMAP[b.f.k])||byReg(a.s,b.s));
   document.getElementById('fabList').innerHTML=act.length?act.map(x=>{const r=RMAP[x.f.k];
-    return `<li><span class="nm" onclick="closeFab();openSheet('${x.l.id}','${esc(x.s.reg)}')">${esc(x.s.name)} <span class="small">${esc(x.s.reg)}</span><span class="unit">${esc(noteOf(x.s,curDate))}</span></span><span class="chip" style="background:${r.c}">${r.t}</span>${r.fx==='open'||r.fx==='days'?`<button class="tb ret" onclick="quickReturn('${x.l.id}','${esc(x.s.reg)}')">عودة</button>`:''}</li>`}).join(''):'<div class="empty">لا يوجد</div>';
+    return `<li><span class="nm" onclick="closeFab();openSheet('${x.l.id}','${esc(x.s.reg)}')">${esc(x.s.name)} <span class="small">${esc(x.s.reg)}</span><span class="unit">${esc(fullNote(x.s,curDate))}</span></span><span class="chip" style="background:${r.c}">${r.t}</span>${r.fx==='open'||r.fx==='days'?`<button class="tb ret" onclick="quickReturn('${x.l.id}','${esc(x.s.reg)}')">عودة</button>`:''}</li>`}).join(''):'<div class="empty">لا يوجد</div>';
 }
 
 /* ---------- استيراد إكسل (محلي بالكامل) ---------- */
@@ -1134,7 +1138,7 @@ async function impRead(inp){
   const numScore=c=>colVals(c).filter(x=>/^[\d\-\/]{2,}$/.test(x)).length;
   const H=hdr>=0?rows[hdr].map(x=>norm(x)):[];
   const fh=re=>H.findIndex(c=>c&&c.length<=25&&re.test(c));
-  let map={reg:fh(/تسجيل|سجل|عسكري/),name:fh(/اسم/),co:fh(/سري/),pl:fh(/فصي/)};
+  let map={reg:fh(/تسجيل|سجل|عسكري/),name:fh(/اسم/),co:fh(/سري/),pl:fh(/فصي/),st:fh(/^الحاله$|^حاله الطالب$/),sd:fh(/تاريخ/),det:fh(/تفاصيل/),memo:fh(/^ملاحظ|^الملاحظ/)};
   if(map.reg<0){const r=fh(/رقم/);if(r>=0&&!KW.ser.test(H[r])&&!isSerial(r))map.reg=r}
   if(map.reg>=0&&isSerial(map.reg))map.reg=-1;
   if(map.reg<0){let bs=0;for(let c=0;c<ncol;c++){if(c===map.name||c===map.co||c===map.pl||isSerial(c))continue;const sc=numScore(c);if(sc>bs){bs=sc;map.reg=c}}}
@@ -1146,12 +1150,21 @@ async function impRead(inp){
   const gb=/رقبا|ط\.ض\.ص/.test(top)?pickB(/رقبا/):/حارس|اغرار|ح\.و\.ت\.د/.test(top)?pickB(/اغرار|حارس/):null;
   if(gb)batchId=gb.id;
   const heads=[];for(let c=0;c<ncol;c++){const h=(hdr>=0&&rows[hdr][c])||('عمود '+String.fromCharCode(65+c%26));const ex=body.map(r=>r[c]).find(Boolean);heads.push(h+(ex?` (مثال: ${String(ex).slice(0,18)})`:''))}
-  IMP={rows:body,map,heads,batchId,leaf:null,file:f.name};
+  IMP={rows:body,map,heads,batchId,leaf:null,file:f.name,upd:map.st>=0||map.memo>=0};
   impRender();document.getElementById('confirm').classList.add('on');
 }
+function stKey(v){v=norm(v);if(!v)return null;if(/لم يلتحق/.test(v))return 'nj';if(/غياب مستمر/.test(v))return 'absc';if(/غياب/.test(v))return 'abs';if(/اعتذار/.test(v))return 'resign';if(/فصل|مفصول/.test(v))return 'fired';if(/مستشفي/.test(v))return 'hosp';if(/راحه/.test(v))return 'home';if(/مراجعه/.test(v))return 'ext';return null}
+function parseDate(v){v=digits(v||'').trim();if(!v)return null;let m;
+  if((m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)))return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if((m=v.match(/(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?/))){let y=m[3]||today().slice(0,4);if(y.length===2)y='20'+y;return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}
+  if(/^\d{5}(\.\d+)?$/.test(v)){const d=new Date(Date.UTC(1899,11,30)+Math.floor(+v)*864e5);return d.toISOString().slice(0,10)}return null}
+function impExtra(r){const m=IMP.map,g=k=>m[k]>=0?String(r[m[k]]||'').replace(/\s+/g,' ').trim():'';
+  let memo=g('memo'),st=stKey(g('st')),det=g('det');
+  if(!st&&memo&&stKey(memo)&&memo.length<20){st=stKey(memo);memo=''}   // عمود ملاحظات فيه حالة (مثل كشوف الفصائل)
+  return {memo,st,since:st?(parseDate(g('sd'))||today()):null,det}}
 function impCompute(){
   const b=N(IMP.batchId),m=IMP.map,split=b.children.length>0,byCols=split&&m.co>=0&&m.pl>=0;
-  const seen=new Map(),add=[],dist=new Map(),dups=[];let dup=0,bad=0,noUnit=0;
+  const seen=new Map(),add=[],dist=new Map(),dups=[],upd=[];let dup=0,bad=0,noUnit=0;
   IMP.rows.forEach(r=>{const reg=digits(r[m.reg]||'').replace(/\s/g,''),name=(r[m.name]||'').replace(/\s+/g,' ').trim();
     if(!reg||!name||!/\d/.test(reg)){bad++;return}
     let leaf;if(!split)leaf=b;else if(byCols){const co=unitNum(r[m.co]),pl=unitNum(r[m.pl]),c=b.children[co-1],l=c&&c.children[pl-1];leaf=l||(c&&!c.children.length?c:null)}
@@ -1159,9 +1172,9 @@ function impCompute(){
     if(!leaf){noUnit++;return}
     const key=leaf.id+'|'+reg;
     if(seen.has(key)){dup++;dups.push({reg,name,why:'مكرر في نفس الفصيل مع: '+seen.get(key)});return}
-    const ex=findReg(reg,leaf);if(ex){dup++;dups.push({reg,name,why:'موجود مسبقاً: '+ex.s.name});return}
-    seen.set(key,name);add.push({leaf,reg,name});dist.set(leaf,(dist.get(leaf)||0)+1)});
-  return {add,dup,bad,noUnit,dist,byCols,split,dups};
+    const ex=findReg(reg,leaf);if(ex){if(IMP.upd){const x=impExtra(r),act=fxActive(ex.s,today());if((x.memo&&x.memo!==ex.s.memo)||(x.st&&(!act||act.k!==x.st))){upd.push({s:ex.s,leaf,...x});seen.set(key,name);return}}dup++;dups.push({reg,name,why:'موجود مسبقاً: '+ex.s.name});return}
+    seen.set(key,name);add.push({leaf,reg,name,...impExtra(r)});dist.set(leaf,(dist.get(leaf)||0)+1)});
+  return {add,dup,bad,noUnit,dist,byCols,split,dups,upd};
 }
 function impRender(){
   const b=N(IMP.batchId),m=IMP.map,opt=k=>`<select onchange="IMP.map.${k}=+this.value;impRender()"><option value="-1">— لا يوجد —</option>${IMP.heads.map((h,i)=>`<option value="${i}" ${m[k]===i?'selected':''}>${esc(h)}</option>`).join('')}</select>`;
@@ -1172,14 +1185,24 @@ function impRender(){
   <div class="row"><div><label class="l">عمود رقم التسجيل</label>${opt('reg')}</div><div><label class="l">عمود الاسم</label>${opt('name')}</div></div>`;
   if(c.split)h+=`<div class="row"><div><label class="l">عمود السرية</label>${opt('co')}</div><div><label class="l">عمود الفصيل</label>${opt('pl')}</div></div>`+
     (c.byCols?'':`<label class="l">ما فيه أعمدة سرية وفصيل — أضفهم كلهم إلى:</label><select onchange="IMP.leaf=this.value;impRender()">${leaves(b).map(l=>`<option value="${l.id}" ${IMP.leaf===l.id?'selected':''}>${esc(relLabel(l,b))}</option>`).join('')}</select>`);
-  h+=`<div class="card" style="margin:12px 0 0;background:#fafaf8"><b>سيتم إضافة ${c.add.length} طالب</b>`+
+  h+=`<div class="row"><div><label class="l">عمود الحالة (اختياري)</label>${opt('st')}</div><div><label class="l">عمود تاريخ الحالة</label>${opt('sd')}</div></div>
+  <div class="row"><div><label class="l">عمود تفاصيل الحالة</label>${opt('det')}</div><div><label class="l">عمود الملاحظة الدائمة</label>${opt('memo')}</div></div>
+  <label class="chk"><input type="checkbox" ${IMP.upd?'checked':''} onchange="IMP.upd=this.checked;impRender()"> حدّث الحالة والملاحظة للطلاب الموجودين مسبقاً</label>`;
+  const all=[...c.add,...c.upd],sc={};all.forEach(x=>{if(x.st)sc[x.st]=(sc[x.st]||0)+1});const mc=all.filter(x=>x.memo).length;
+  h+=`<div class="card" style="margin:12px 0 0;background:#fafaf8"><b>سيتم إضافة ${c.add.length} طالب</b>${c.upd.length?` <b>· تحديث ${c.upd.length}</b>`:''}`+
+    (Object.keys(sc).length||mc?`<div class="small" style="margin-top:6px">${Object.entries(sc).map(([k,n])=>`${RMAP[k].t}: ${n}`).join(' · ')}${mc?` · ملاحظات: ${mc}`:''}</div>`:'')+
     (c.split&&c.dist.size?`<div class="small" style="margin-top:6px;line-height:1.8">${[...c.dist].map(([l,n])=>`${esc(relLabel(l,b))}: ${n}`).join('<br>')}</div>`:'')+
     `<div class="small" style="margin-top:6px">${c.dup?`مكرر/موجود مسبقاً: ${c.dup} · `:''}${c.bad?`صفوف ناقصة: ${c.bad} · `:''}${c.noUnit?`<span style="color:var(--warn)">سرية/فصيل غير معروف: ${c.noUnit}</span>`:''}</div>`+
     (c.dups.length?`<div class="small" style="margin-top:8px;color:var(--warn);line-height:1.8"><b>أرقام تسجيل مكررة (ما بتنضاف):</b><br>${c.dups.slice(0,15).map(d=>esc(`${d.reg} ${d.name} ← ${d.why}`)).join('<br>')}${c.dups.length>15?`<br>و${c.dups.length-15} غيرهم`:''}</div>`:'')+
     (c.add.length?`<div class="small" style="margin-top:8px">مثال: ${c.add.slice(0,3).map(x=>esc(x.reg+' '+x.name)).join(' ، ')}</div>`:'')+`</div>`;
   document.getElementById('cfMsg').textContent='استيراد الأسماء';document.getElementById('cfBody').innerHTML=h;
   const y=document.getElementById('cfYes');y.textContent=`إضافة ${c.add.length}`;
-  y.onclick=()=>{const r=impCompute();if(!r.add.length)return toast('ما فيه أسماء للإضافة');r.add.forEach(x=>x.leaf.students.push({reg:x.reg,name:x.name}));save();closeConfirm();renderAll();toast(`تمت إضافة ${r.add.length} طالب ✓`)};
+  if(c.upd.length)y.textContent+=` + تحديث ${c.upd.length}`;
+  y.onclick=()=>{const r=impCompute();if(!r.add.length&&!r.upd.length)return toast('ما فيه أسماء للإضافة');snapshot('قبل استيراد إكسل');
+    const mkfx=x=>x.st?[{k:x.st,since:x.since,note:x.det||'',end:null}]:undefined;
+    r.add.forEach(x=>{const st={reg:x.reg,name:x.name};if(x.memo)st.memo=x.memo;const fx=mkfx(x);if(fx)st.fx=fx;x.leaf.students.push(st)});
+    r.upd.forEach(x=>{if(x.memo)x.s.memo=x.memo;if(x.st){const a=fxActive(x.s,today());if(!a||a.k!==x.st){x.s.fx=(x.s.fx||[]).filter(e=>e.since<x.since);x.s.fx.forEach(e=>{if(!e.end||e.end>x.since)e.end=x.since});x.s.fx.push({k:x.st,since:x.since,note:x.det||'',end:null})}}});
+    save();closeConfirm();renderAll();toast(`تمت إضافة ${r.add.length} طالب`+(r.upd.length?` وتحديث ${r.upd.length}`:'')+' ✓')};
 }
 
 /* ---------- كشف المحجوزين ---------- */
