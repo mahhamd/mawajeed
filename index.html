@@ -118,6 +118,14 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 .pres button:active{background:var(--pri);color:#fff}
 .pres input{min-width:0}
 #fab[data-badge]:not([data-badge=''])::after{content:attr(data-badge);position:absolute;top:-6px;right:-6px;background:#d9822b;color:#fff;border-radius:12px;min-width:22px;height:22px;font-size:13px;line-height:22px;text-align:center;padding:0 5px}
+.kr{display:block!important;cursor:default!important}
+.kr .top{display:flex;align-items:center;gap:8px}
+.kseg{display:flex;gap:6px;margin-top:8px}
+.kseg button{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:9px 4px;font-size:14px;font-weight:600;color:var(--muted)}
+.kseg button.p.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.kseg button.a.on{background:#7a3b2e;border-color:#7a3b2e;color:#fff}
+.kseg button.o.on{background:#b5462f;border-color:#b5462f;color:#fff}
+nav button{font-size:11px}
 .more{text-align:center;font-size:13px;color:var(--muted);padding:10px}
 </style>
 </head>
@@ -162,6 +170,36 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
       <button id="fAbs" onclick="setFilter('abs')">المتفرقة فقط</button>
     </div>
     <ul class="list" id="stList"></ul>
+  </div>
+</section>
+
+<!-- ======= الكشوف ======= -->
+<section class="view" id="v-kashf">
+  <div class="card">
+    <label class="l" style="margin-top:0">اختر الفصيل</label>
+    <select id="kSel" onchange="kLeaf=this.value;renderKashf()"></select>
+  </div>
+  <div class="card" id="kHead" style="text-align:center;line-height:1.7"></div>
+  <div class="stats" style="margin-bottom:12px">
+    <div class="stat"><span>العام</span><b id="kT">0</b></div>
+    <div class="stat"><span>الحالي</span><b id="kP" class="sum">0</b></div>
+    <div class="stat hl"><span>المتفرقة</span><b id="kA">0</b></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span class="small" id="kProg"></span>
+      <button class="tb" onclick="kAllPresent()">✓ الباقي حاضر</button>
+    </div>
+    <input id="kSearch" type="text" placeholder="🔍 بحث برقم التسجيل أو الاسم" style="margin-top:8px" oninput="renderKashf()">
+    <ul class="list" id="kList"></ul>
+  </div>
+  <div class="card">
+    <b>تصدير الكشف</b>
+    <button class="btn full" style="margin-top:8px" onclick="kPdfShare()">📄 إرسال PDF (واتساب)</button>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sec" onclick="kPdfSave()">حفظ PDF</button>
+      <button class="btn sec" onclick="kTextShare()">إرسال كنص</button>
+    </div>
   </div>
 </section>
 
@@ -328,6 +366,7 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 
 <nav>
   <button class="on" data-v="today" onclick="go('today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>الموجود</button>
+  <button data-v="kashf" onclick="go('kashf')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8.5 10l1.5 1.5 3-3M8.5 16l1.5 1.5 3-3M15 11h1M15 17h1"/></svg>الكشوف</button>
   <button data-v="report" onclick="go('report')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>التقرير</button>
   <button data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>المحجوزين</button>
   <button data-v="students" onclick="go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5.5"/></svg>الطلبة</button>
@@ -409,7 +448,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.8.0';
+const APP_VERSION='1.9.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -491,7 +530,7 @@ function renderAll(){
   reindex();
   ['scopeSel','scopeSel2'].forEach(id=>{const e=document.getElementById(id);e.innerHTML=scopeOptions(S.scope);e.value=S.scope});
   document.getElementById('dateIn').value=curDate;
-  renderToday();renderReport();renderStudents();renderSettings();renderDet();renderDue();
+  renderToday();renderReport();renderStudents();renderSettings();renderDet();renderKashf();renderDue();
 }
 function renderToday(){
   const n=scopeN(),k=calc(n),leaf=isLeaf(n);
@@ -580,7 +619,7 @@ function renderSettings(){
 }
 
 /* ---------- الأحداث ---------- */
-function go(v){view=v;document.getElementById('fab').classList.toggle('hide',v!=='today');document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='report')renderReport();if(v==='det')renderDet();window.scrollTo(0,0)}
+function go(v){view=v;document.getElementById('fab').classList.toggle('hide',v!=='today');document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='report')renderReport();if(v==='kashf')renderKashf();if(v==='det')renderDet();window.scrollTo(0,0)}
 function setScope(id){S.scope=IDX[id]?id:'all';const n=scopeN();if(isLeaf(n))stLeaf=n.id;save();document.getElementById('search').value='';renderAll();window.scrollTo(0,0)}
 function setDate(d){curDate=d||today();renderAll()}
 function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle('on',f==='all');document.getElementById('fAbs').classList.toggle('on',f==='abs');renderList()}
@@ -846,6 +885,68 @@ async function pdfFile(){
 async function pdfShare(){toast('جاري تجهيز الملف...');try{const f=await pdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function pdfSave(){try{dl(await pdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 function dl(f){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+
+/* ---------- الكشوف (تحضير الفصيل) — مربوط بالموجود ---------- */
+let kLeaf=null;
+function kL(){const all=S.batches.flatMap(leaves);if(!kLeaf||!IDX[kLeaf]||!isLeaf(N(kLeaf))){const n=scopeN();kLeaf=isLeaf(n)?n.id:(leaves(n)[0]||all[0]||{}).id}return kLeaf?N(kLeaf):null}
+function kState(l,s){const k=eff(l,s,curDate);if(k==='abs'||k==='absc')return 'a';if(k)return 'o';const d=l.days[curDate];return d&&d.ok&&d.ok[s.reg]?'p':''}
+function kHeadLines(l){const c=chain(l);return [label(c[0]),...c.slice(1).map(x=>x.name)]}
+function renderKashf(){
+  const sel=document.getElementById('kSel'),l=kL();
+  sel.innerHTML=S.batches.flatMap(leaves).map(x=>`<option value="${x.id}">${esc(fullLabel(x))}</option>`).join('');
+  if(!l){document.getElementById('kList').innerHTML='<div class="empty">لا توجد وحدات</div>';return}
+  sel.value=l.id;const k=calc(l),hl=kHeadLines(l);
+  document.getElementById('kHead').innerHTML=`<b style="font-size:18px">${esc(hl[0])}</b>${hl.slice(1).map(x=>`<div style="font-weight:600">${esc(x)}</div>`).join('')}<div class="small">${fmtDate(curDate)}</div>`;
+  document.getElementById('kT').textContent=k.total;document.getElementById('kP').textContent=k.present;document.getElementById('kA').textContent=k.absent;
+  const st=l.students.map(s=>kState(l,s)),done=st.filter(Boolean).length;
+  document.getElementById('kProg').textContent=`تم تحضير ${done} من ${l.students.length}`;
+  const q=norm(document.getElementById('kSearch').value);
+  const arr=[...l.students].sort(byReg).filter(s=>!q||norm(s.reg).includes(q)||norm(s.name).includes(q));
+  document.getElementById('kList').innerHTML=arr.length?arr.map(s=>{const t=kState(l,s),e=eff(l,s,curDate),r=e&&RMAP[e],nt=noteOf(s,curDate),R_=esc(s.reg);
+    return `<li class="kr"><div class="top"><span class="reg">${R_}</span><span class="nm">${esc(s.name)}${nt?`<span class="unit" style="color:var(--warn)">${esc(nt)}</span>`:''}</span>${r&&t==='o'?`<span class="chip" style="background:${r.c}">${r.t}</span>`:''}</div>
+      <div class="kseg"><button class="p ${t==='p'?'on':''}" onclick="kPresent('${l.id}','${R_}')">حاضر</button><button class="a ${t==='a'?'on':''}" onclick="kAbsent('${l.id}','${R_}')">غياب</button><button class="o ${t==='o'?'on':''}" onclick="openSheet('${l.id}','${R_}')">متفرقة</button></div></li>`}).join(''):'<div class="empty">لا يوجد طلبة في هذا الفصيل</div>';
+}
+function kEndActive(s){const a=fxActive(s,curDate);if(!a)return;if(a.since>=curDate)s.fx.splice(s.fx.indexOf(a),1);else a.end=curDate}
+function kPresent(lid,reg){const l=N(lid),s=l.students.find(x=>x.reg===reg),a=fxActive(s,curDate);
+  const go=()=>{const snap=absSnap(l,s),d=dayMk(l);delete d.abs[reg];kEndActive(s);d.ok=d.ok||{};d.ok[reg]=1;fixPresent(l,s,snap);save();renderAll()};
+  if(a&&RMAP[a.k].fx==='perm')ask(`${s.name} عليه «${RMAP[a.k].t}». تسجيله حاضر يلغيها من اليوم؟`,go);else go()}
+function kAbsent(lid,reg){const l=N(lid),s=l.students.find(x=>x.reg===reg),a=fxActive(s,curDate);if(a&&(a.k==='abs'||a.k==='absc'))return;
+  const go=()=>{const snap=absSnap(l,s),d=dayMk(l);delete d.abs[reg];if(d.ok)delete d.ok[reg];kEndActive(s);s.fx=s.fx||[];s.fx.push({k:'abs',since:curDate,note:'',end:null});fixPresent(l,s,snap);save();renderAll();toast(`غياب — ${s.name} (يبقى غائب لين تضغط حاضر)`)};
+  if(a)ask(`${s.name} مسجل «${RMAP[a.k].t}». تغيّره إلى غياب؟`,go);else go()}
+function kAllPresent(){const l=kL();if(!l)return;const d=dayMk(l);d.ok=d.ok||{};let n=0;l.students.forEach(s=>{if(!eff(l,s,curDate)&&!d.ok[s.reg]){d.ok[s.reg]=1;n++}});save();renderKashf();toast(n?`تم تحضير ${n} حاضر ✓`:'الكل محضّر')}
+function kStatusTxt(l,s){const e=eff(l,s,curDate);return e?RMAP[e].t:(kState(l,s)==='p'?'حاضر':'—')}
+function kText(){const l=kL(),k=calc(l),hl=kHeadLines(l);
+  let t=`*كشف تحضير*\n${hl.join('\n')}\n${fmtDate(curDate)}\n\nالعام: ${k.total}\nالحالي: ${k.present}\nالمتفرقة: ${k.absent}\n\n`;
+  t+=[...l.students].sort(byReg).map((s,i)=>{const nt=noteOf(s,curDate);return `${i+1}- ${s.reg} ${s.name} — ${kStatusTxt(l,s)}`+(nt?`\n   ${nt}`:'')}).join('\n');return t}
+async function kTextShare(){const t=kText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
+function kPages(){
+  const l=kL(),k=calc(l),hl=kHeadLines(l),st=[...l.students].sort(byReg),f=info(l),anyN=st.some(s=>noteOf(s,curDate)),land=anyN;
+  const W=land?PH:PW,H=land?PW:PH,inner=W-2*PM,RH=56;
+  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},{t:'الحالة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:560}]:[])];
+  const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
+  const data=st.map((s,i)=>[i+1,f.abbr,s.reg,s.name,kStatusTxt(l,s),...(anyN?[noteOf(s,curDate)]:[])]);
+  const out=[];let p,x,y,part=0;
+  const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;let yy=PM+28;
+    T(x,'كشف تحضير'+(part?' (تابع)':''),W/2,yy,{sz:48,b:1,al:'center'});yy+=62;
+    T(x,hl[0],W/2,yy,{sz:32,b:1,al:'center',max:inner});yy+=46;
+    if(hl.length>1){T(x,hl.slice(1).join('  —  '),W/2,yy,{sz:30,b:1,al:'center'});yy+=44}
+    T(x,`${fmtDate(curDate)}   ·   العام: ${k.total}   ·   الحالي: ${k.present}   ·   المتفرقة: ${k.absent}`,W/2,yy,{sz:26,c:'#333',al:'center'});
+    y=yy+34;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-12,y+RH/2,{sz:24,b:1,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
+  top();
+  data.forEach((r,i)=>{if(y+RH>H-PM-60)top();const abs=r[4]!=='حاضر'&&r[4]!=='—';
+    if(abs){x.fillStyle='#e4e4e4';x.fillRect(PM,y,inner,RH)}else if(i%2){x.fillStyle='#f6f6f6';x.fillRect(PM,y,inner,RH)}
+    let cx=W-PM;r.forEach((v,j)=>{const c=cols[j];T(x,v,c.al?cx-c.w/2:cx-12,y+RH/2,{sz:c.t==='ملاحظة'?21:24,b:j===4&&abs,max:c.w-18,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#bbb';x.lineWidth=1;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(W-PM,y+RH);x.stroke();y+=RH});
+  if(y+150>H-PM)top();
+  T(x,'المسؤول: ......................................',W-PM,H-PM-80,{sz:29});T(x,'التوقيع: ......................',PM,H-PM-80,{sz:29,al:'left'});
+  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));
+  return out}
+async function kPdfFile(){if(document.fonts&&document.fonts.ready)await document.fonts.ready;const l=kL();
+  return new File([makePDF(kPages())],`كشف-${chain(l).map(shortName).join('-')}-${curDate}.pdf`.replace(/[\\/:*?"<>|]/g,'-'),{type:'application/pdf'})}
+async function kPdfShare(){if(!kL())return;try{const f=await kPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
+async function kPdfSave(){if(!kL())return;try{dl(await kPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 
 /* ---------- تقرير خاص ---------- */
 function specSel(){if(!Array.isArray(S.spec))S.spec=['hosp','home','abs'];return S.spec}

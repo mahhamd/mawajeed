@@ -1,5 +1,5 @@
 // غيّر رقم النسخة هنا مع كل تحديث (لازم يطابق APP_VERSION في index.html)
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 const CACHE = 'mawajeed-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
