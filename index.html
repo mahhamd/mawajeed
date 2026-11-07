@@ -126,6 +126,12 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 .kseg button.a.on{background:#7a3b2e;border-color:#7a3b2e;color:#fff}
 .kseg button.o.on{background:#b5462f;border-color:#b5462f;color:#fff}
 nav button{font-size:11px}
+.ep{border-right:5px solid #aaa;padding:6px 10px;margin:6px 0;border-radius:8px;background:#f4f4f4;color:#777;white-space:normal;line-height:1.6}
+.ep.act{border-color:#2f7a4f;background:#e8f4ec;color:#1f5e3a}
+.ep.hos{border-color:#b3261e;background:#fbe9e7;color:#8e1f18}
+.ep b{color:inherit}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:4px 0 8px}
+.legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-left:4px;vertical-align:middle;background:var(--c)}
 .more{text-align:center;font-size:13px;color:var(--muted);padding:10px}
 </style>
 </head>
@@ -220,9 +226,14 @@ nav button{font-size:11px}
   </div>
   <div class="card">
     <b>📑 تقرير خاص</b>
-    <p class="small">اختر نوع أو أكثر من المتفرقة، ويطلع التقرير بأسمائهم فقط (حسب المستوى المختار بالأعلى).</p>
+    <div class="seg"><button id="smCur" onclick="setSpecMode('cur')">المتفرقة الحالية</button><button id="smGen" onclick="setSpecMode('gen')">المتفرقة العامة</button></div>
+    <div id="specRange" class="row" style="display:none;margin-bottom:6px">
+      <div><label class="l" style="margin-top:0">من</label><input id="specFrom" type="date" onchange="S.specFrom=this.value;save();renderSpec()"></div>
+      <div><label class="l" style="margin-top:0">إلى</label><input id="specTo" type="date" onchange="S.specTo=this.value;save();renderSpec()"></div>
+    </div>
+    <p class="small" id="specHint"></p>
     <div class="dgrid" id="specOpts" style="margin:8px 0 10px"></div>
-    <pre class="rep" id="specText" style="max-height:260px;overflow:auto"></pre>
+    <div class="rep" id="specText" style="max-height:340px;overflow:auto;white-space:pre-wrap;background:#fafaf8;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;line-height:1.7"></div>
     <button class="btn full" style="margin-top:10px" onclick="specPdfShare()">📄 إرسال PDF (واتساب)</button>
     <div class="row" style="margin-top:8px">
       <button class="btn sec" onclick="specPdfSave()">حفظ PDF</button>
@@ -448,7 +459,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.9.0';
+const APP_VERSION='1.10.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -959,11 +970,67 @@ function specText(){const n=scopeN(),rows=specRows(),sel=REASONS.filter(r=>specS
   t+=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('\n')+`\nالمجموع: ${rows.length}\n`;
   sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(noteOf(x.s,curDate)?`\n   ${noteOf(x.s,curDate)}`:'')).join('\n')+'\n'});
   return t.trim()}
-function renderSpec(){const sel=specSel();
+function specMode(){return S.specMode==='gen'?'gen':'cur'}
+function setSpecMode(m){S.specMode=m;save();renderSpec()}
+function specRange(){const t=today();if(!S.specFrom)S.specFrom=t.slice(0,8)+'01';if(!S.specTo)S.specTo=t;let a=S.specFrom,b=S.specTo;if(a>b)[a,b]=[b,a];return [a,b]}
+// كل فترات المتفرقة (المنتهية والفعالة) اللي تتقاطع مع الفترة المختارة
+function episodes(){const n=scopeN(),sel=specSel(),[from,to]=specRange(),t=today(),out=[];
+  leaves(n).forEach(l=>l.students.forEach(s=>{
+    (s.fx||[]).forEach(e=>{if(!sel.includes(e.k))return;if(e.since<=to&&(!e.end||e.end>from))out.push({l,s,k:e.k,since:e.since,end:e.end||null,due:e.due||null,note:e.note||'',cause:e.cause||''})});
+    Object.entries(l.days).forEach(([d,x])=>{const k=x.abs&&x.abs[s.reg];if(k&&sel.includes(k)&&d>=from&&d<=to)out.push({l,s,k,since:d,end:addDays(d,1),daily:1,note:'',cause:''})});
+  }));
+  out.forEach(e=>{e.active=!e.end||e.end>t;e.cls=e.active?(e.k==='hosp'?'hos':'act'):'';
+    e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1));
+    e.endTxt=e.daily?dm(e.since):e.end?dm(e.last):(e.due?`مستمرة (العودة المتوقعة ${dm(e.due)})`:'مستمرة');
+    e.stTxt=e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية';
+    e.info=[e.cause?'السبب: '+e.cause:'',e.note].filter(Boolean).join(' — ')});
+  return out.sort((a,b)=>REASONS.indexOf(RMAP[a.k])-REASONS.indexOf(RMAP[b.k])||(b.active-a.active)||a.since.localeCompare(b.since)||byReg(a.s,b.s))}
+function genText(){const n=scopeN(),E=episodes(),[from,to]=specRange(),sel=REASONS.filter(r=>specSel().includes(r.k));
+  let t=`*تقرير ${specTitle()} — المتفرقة العامة*\n${fullLabel(n)}\nمن ${dm(from)} إلى ${dm(to)}\n\n`;
+  t+=sel.map(r=>{const l=E.filter(e=>e.k===r.k);return `${r.t}: ${l.length} (فعالة ${l.filter(e=>e.active).length} · منتهية ${l.filter(e=>!e.active).length})`}).join('\n')+`\nالمجموع: ${E.length}\n`;
+  sel.forEach(r=>{const l=E.filter(e=>e.k===r.k);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((e,i)=>`${i+1}- ${tag(e)}\n   من ${dm(e.since)} ${e.end||e.daily?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)} — ${e.stTxt}`+(e.info?`\n   ${e.info}`:'')).join('\n')+'\n'});
+  return t.trim()}
+function genHtml(){const n=scopeN(),E=episodes(),[from,to]=specRange(),sel=REASONS.filter(r=>specSel().includes(r.k));
+  let h=`<b>${esc(fullLabel(n))}</b> — من ${dm(from)} إلى ${dm(to)}<div class="legend"><span style="--c:#2f7a4f">فعالة</span><span style="--c:#b3261e">مستشفى لازال</span><span style="--c:#aaa">منتهية</span></div>`;
+  sel.forEach(r=>{const l=E.filter(e=>e.k===r.k);h+=`<div style="margin-top:8px"><b>${r.t}</b> <span class="small">(${l.length} — فعالة ${l.filter(e=>e.active).length} · منتهية ${l.filter(e=>!e.active).length})</span></div>`;
+    h+=l.length?l.map(e=>`<div class="ep ${e.cls}"><b>${esc(e.s.name)}</b> <span style="font-size:13px">${esc(e.s.reg)} · ${esc(unitTxt(e.l))}</span><br>من ${dm(e.since)} ${e.end||e.daily?'إلى '+esc(e.endTxt):'— '+esc(e.endTxt)} — ${daysTxt(e.dur)} — <b>${e.stTxt}</b>${e.info?`<br><span style="font-size:13px">${esc(e.info)}</span>`:''}</div>`).join(''):'<div class="small">لا يوجد</div>'});
+  return h}
+function genPages(){
+  const n=scopeN(),E=episodes(),[from,to]=specRange(),W=PH,H=PW,inner=W-2*PM,RH=56,hasCo=E.some(e=>info(e.l).co),anyN=E.some(e=>e.info);
+  const cols=[{t:'م',w:50,al:1},{t:'دورة',w:120,al:1},{t:'رقم التسجيل',w:140,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'س/ف',w:80,al:1}]:[]),{t:'نوع المتفرقة',w:180,al:1},{t:'البداية',w:140,al:1},{t:'النهاية',w:150,al:1},{t:'المدة',w:90,al:1},{t:'الحالة',w:100,al:1},...(anyN?[{t:'السبب / ملاحظة',w:300}]:[])];
+  const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
+  const sel=REASONS.filter(r=>specSel().includes(r.k)),act=E.filter(e=>e.active).length;
+  const out=[];let p,x,y,part=0;
+  const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
+    T(x,`تقرير ${specTitle()} — المتفرقة العامة`+(part?' (تابع)':''),W/2,PM+28,{sz:42,b:1,al:'center',max:inner});
+    T(x,`${fullLabel(n)} — من ${dm(from)} إلى ${dm(to)}`,W/2,PM+86,{sz:27,al:'center',max:inner});
+    T(x,sel.map(r=>`${r.t}: ${E.filter(e=>e.k===r.k).length}`).join('   ·   ')+`   ·   المجموع: ${E.length} (فعالة ${act} · منتهية ${E.length-act})`,W/2,PM+128,{sz:23,b:1,c:'#333',al:'center',max:inner});
+    // مفتاح الألوان
+    [['فعالة','#1f7a45'],['مستشفى لازال','#b3261e'],['منتهية','#8a8a8a']].forEach(([t,c],i)=>{const X=W-PM-i*230;x.fillStyle=c;x.fillRect(X-24,PM+152,20,20);T(x,t,X-34,PM+162,{sz:21,c})});
+    y=PM+190;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-10,y+RH/2,{sz:22,b:1,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
+  top();
+  if(!E.length)T(x,'لا يوجد',W/2,y+80,{sz:32,c:'#777',al:'center'});
+  E.forEach((e,i)=>{if(y+RH>H-PM-60)top();const f=info(e.l),col=e.active?(e.k==='hosp'?'#b3261e':'#1f7a45'):'#8a8a8a',bg=e.active?(e.k==='hosp'?'#fbe9e7':'#e8f4ec'):'#f0f0f0';
+    x.fillStyle=bg;x.fillRect(PM,y,inner,RH);x.fillStyle=col;x.fillRect(W-PM-7,y,7,RH);
+    const r=[i+1,f.abbr,e.s.reg,e.s.name,...(hasCo?[f.co?`${f.co}/${f.pl}`:'']:[]),RMAP[e.k].t,dm(e.since),e.daily?dm(e.since):e.end?dm(e.last):'مستمرة',daysTxt(e.dur),e.stTxt,...(anyN?[e.info]:[])];
+    let cx=W-PM;r.forEach((v,j)=>{const c=cols[j];T(x,v,c.al?cx-c.w/2:cx-10,y+RH/2,{sz:c.t==='السبب / ملاحظة'?19:22,b:c.t==='الحالة',c:col,max:c.w-16,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#fff';x.lineWidth=2;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(W-PM,y+RH);x.stroke();y+=RH});
+  if(y+150>H-PM)top();
+  T(x,'المسؤول: ......................................',W-PM,H-PM-80,{sz:29});T(x,'التوقيع: ......................',PM,H-PM-80,{sz:29,al:'left'});
+  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));
+  return out}
+function renderSpec(){const sel=specSel(),gen=specMode()==='gen';
+  document.getElementById('smCur').classList.toggle('on',!gen);document.getElementById('smGen').classList.toggle('on',gen);
+  document.getElementById('specRange').style.display=gen?'':'none';
+  if(gen){const [a,b]=specRange();document.getElementById('specFrom').value=S.specFrom;document.getElementById('specTo').value=S.specTo}
+  document.getElementById('specHint').textContent=gen?'كل المتفرقة اللي صارت خلال الفترة (المنتهية والفعالة) مع تاريخ البداية والنهاية.':'اللي في المتفرقة بتاريخ اليوم المختار بالأعلى (حسب المستوى المختار).';
   document.getElementById('specOpts').innerHTML=REASONS.map(r=>`<button class="opt ${sel.includes(r.k)?'on':''}" onclick="toggleSpec('${r.k}')"><span class="dot" style="background:${r.c}"></span>${sel.includes(r.k)?'☑':'☐'} ${r.t}</button>`).join('');
-  document.getElementById('specText').textContent=sel.length?specText():'اختر نوع واحد على الأقل'}
+  const st=document.getElementById('specText');if(!sel.length){st.textContent='اختر نوع واحد على الأقل';return}
+  if(gen)st.innerHTML=genHtml();else st.textContent=specText()}
 function specReady(){if(!specSel().length){toast('اختر نوع واحد على الأقل');return false}return true}
-async function specTextShare(){if(!specReady())return;const t=specText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
+async function specTextShare(){if(!specReady())return;const t=specMode()==='gen'?genText():specText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
 function specPages(){
   const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>noteOf(x.s,curDate));
   const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),{t:'نوع المتفرقة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:640}]:[])];
@@ -988,8 +1055,9 @@ function specPages(){
   out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));
   return out}
 async function specPdfFile(){if(document.fonts&&document.fonts.ready)await document.fonts.ready;const n=scopeN();
-  const nm=`تقرير-${REASONS.filter(r=>specSel().includes(r.k)).map(r=>r.s).join('-')}-${n===ROOT?'الكل':chain(n).map(shortName).join('-')}-${curDate}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
-  return new File([makePDF(specPages())],nm,{type:'application/pdf'})}
+  const gen=specMode()==='gen',[a,b]=specRange();
+  const nm=`تقرير-${gen?'عام-':''}${REASONS.filter(r=>specSel().includes(r.k)).map(r=>r.s).join('-')}-${n===ROOT?'الكل':chain(n).map(shortName).join('-')}-${gen?a+'_'+b:curDate}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
+  return new File([makePDF(gen?genPages():specPages())],nm,{type:'application/pdf'})}
 async function specPdfShare(){if(!specReady())return;try{const f=await specPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function specPdfSave(){if(!specReady())return;try{dl(await specPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
 
