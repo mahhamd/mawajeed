@@ -286,6 +286,12 @@ nav button{font-size:11px}
 <!-- ======= الإعدادات ======= -->
 <section class="view" id="v-settings">
   <div class="card">
+    <b>⭐ المجموعات</b>
+    <p class="small">تجمع سرايا أو فصائل أو دفعات تحت اسم واحد (مثل الصمود = السرية الأولى والثانية) عشان تعزل موجودها أو تجمعه. تطلع في القائمة اللي فوق.</p>
+    <ul class="list" id="grpList"></ul>
+    <button class="btn sec full" style="margin-top:8px" onclick="editGroup(null)">＋ مجموعة جديدة</button>
+  </div>
+  <div class="card">
     <b>الدفعات والسرايا والفصائل</b>
     <p class="small">اضغط «✏️ تحرير» عند أي دورة لتغيير اسمها أو رقمها أو مختصرها.</p>
     <div id="treeEd"></div>
@@ -460,7 +466,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.11.0';
+const APP_VERSION='1.12.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -489,21 +495,27 @@ function load(){
   }
   S.batches.forEach(b=>{if(b.abbr===undefined)b.abbr=/الأغرار|حارس/.test(b.name)?'ح.و.ت.د':/الرقباء/.test(b.name)?'ط.ض.ص':''});
   if(!Array.isArray(S.dets))S.dets=[];
+  if(!Array.isArray(S.groups)){S.groups=[];const g=S.batches.find(b=>/اغرار|الأغرار/.test(b.name)&&b.children.length>=3);
+    if(g){S.groups.push({id:uid(),name:'الصمود',members:[g.children[0].id,g.children[1].id]},{id:uid(),name:'التحرير',members:[g.children[2].id]})}}
   S.batches.forEach(b=>leaves(b).forEach(l=>l.students.forEach(st=>(st.fx||[]).forEach(e=>{if(e.k==='home'&&e.days&&!e.due&&e.end&&e.end===addDays(e.since,e.days)&&e.end>today()){e.due=e.end;e.end=null}}))));
   reindex();if(!IDX[S.scope])S.scope='all';
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('تعذر الحفظ!')}}
-function reindex(){IDX={};ROOT.children=S.batches;const w=(n,p,d)=>{IDX[n.id]={n,p,d};n.children.forEach(c=>w(c,n,d+1))};w(ROOT,null,0)}
+function reindex(){IDX={};ROOT.children=S.batches;const w=(n,p,d)=>{IDX[n.id]={n,p,d};n.children.forEach(c=>w(c,n,d+1))};w(ROOT,null,0);
+  // المجموعات: وحدات افتراضية تجمع سرايا/فصائل/دفعات (مثل الصمود = س1+س2) بدون ما تغيّر الهيكل
+  (S.groups||[]).forEach(g=>{const ch=g.members.map(id=>IDX[id]&&IDX[id].n).filter(Boolean);IDX[g.id]={n:{id:g.id,name:g.name,virtual:1,children:ch,students:[],days:{}},p:ROOT,d:1}})}
+function groupOf(n){if(!S.groups||n===ROOT||n.virtual)return null;const ids=chain(n).map(x=>x.id);return S.groups.find(g=>g.members.some(id=>ids.includes(id)&&IDX[id]&&IDX[id].d>1))||null}
 function N(id){return (IDX[id]||IDX.all).n}
 function scopeN(){return N(S.scope)}
 function isLeaf(n){return n!==ROOT&&!n.children.length}
-function leaves(n){return n.children.length?n.children.flatMap(leaves):(n===ROOT?[]:[n])}
+function leaves(n){if(n.virtual)return [...new Set(n.children.flatMap(leaves))];return n.children.length?n.children.flatMap(leaves):(n===ROOT?[]:[n])}
 function label(n){return (IDX[n.id]&&IDX[n.id].d===1&&n.num)?`${n.name} (${n.num})`:n.name}
 function chain(n){const a=[];let x=n;while(x&&x!==ROOT){a.unshift(x);x=IDX[x.id].p}return a}
-function fullLabel(n){return n===ROOT?ROOT.name:chain(n).map(label).join(' — ')}
+function headLines(n){if(n===ROOT)return [ROOT.name];if(n.virtual)return [n.name];const c=chain(n).map(label),g=groupOf(n);if(g)c.splice(1,0,g.name);return c}
+function fullLabel(n){return headLines(n).join(' — ')}
 function relChain(leaf,scope){const c=chain(leaf),i=scope===ROOT?-1:c.indexOf(scope);return c.slice(i+1)}
 function relLabel(leaf,scope){return relChain(leaf,scope).map(label).join(' / ')}
-function shortName(n){const d=IDX[n.id].d,p=IDX[n.id].p;if(d===1){return n.name.replace(/^دفعة\s*/,'').split(/\s+/)[0]+(n.num?' '+n.num:'')}const i=p.children.indexOf(n)+1;return (d===2?'س':d===3?'ف':'')+i}
+function shortName(n){if(n.virtual)return n.name;const d=IDX[n.id].d,p=IDX[n.id].p;if(d===1){return n.name.replace(/^دفعة\s*/,'').split(/\s+/)[0]+(n.num?' '+n.num:'')}const i=p.children.indexOf(n)+1;return (d===2?'س':d===3?'ف':'')+i}
 function relShort(leaf,scope){return relChain(leaf,scope).map(shortName).join('/')}
 function info(l){const c=chain(l),ix=i=>c[i]?IDX[c[i].id].p.children.indexOf(c[i])+1:'';return {abbr:c[0].abbr||'',co:ix(1),pl:ix(2)}}
 function tag(x){const i=info(x.l);return [i.abbr,x.s.reg,x.s.name,i.co?'س'+i.co:'',i.pl?'ف'+i.pl:''].filter(Boolean).join(' ')}
@@ -537,6 +549,7 @@ function studentsIn(n){return leaves(n).flatMap(l=>l.students.map(s=>({s,l})))}
 function scopeOptions(sel){
   const o=[`<option value="all">📋 جميع الدفعات</option>`];
   const w=(n,d)=>{o.push(`<option value="${n.id}" ${n.id===sel?'selected':''}>${'   '.repeat(d-1)}${d>1?'↳ ':''}${esc(label(n))}</option>`);n.children.forEach(c=>w(c,d+1))};
+  if(!sel||sel!=='__noGroups')(S.groups||[]).forEach(g=>{const n=IDX[g.id]&&IDX[g.id].n;if(n)o.splice(1+(S.groups.indexOf(g)),0,`<option value="${g.id}" ${g.id===sel?'selected':''}>⭐ ${esc(g.name)}</option>`)});
   S.batches.forEach(b=>w(b,1));return o.join('');
 }
 function renderAll(){
@@ -627,7 +640,8 @@ function renderSettings(){
   let sn=null;try{sn=JSON.parse(localStorage.getItem(SNAP))}catch(e){}
   document.getElementById('verInfo').textContent=`نسخة البرنامج: ${APP_VERSION}`+(sn?` · آخر نسخة تلقائية للبيانات: ${sn.at} (${sn.why})`:'');
   document.getElementById('restoreBtn').style.display=sn?'':'none';
-  {const e=document.getElementById('expScope'),v=e.value;e.innerHTML=scopeOptions(null).replace('📋 جميع الدفعات','📋 جميع الدفعات (نسخة كاملة)');e.value=IDX[v]?v:'all'}
+  {const e=document.getElementById('expScope'),v=e.value;e.innerHTML=scopeOptions('__noGroups').replace('📋 جميع الدفعات','📋 جميع الدفعات (نسخة كاملة)');e.value=IDX[v]?v:'all'}
+  document.getElementById('grpList').innerHTML=(S.groups||[]).length?S.groups.map(g=>{const n=IDX[g.id]&&IDX[g.id].n;return `<li style="cursor:default"><span class="nm"><b>⭐ ${esc(g.name)}</b><span class="unit">${g.members.map(id=>IDX[id]?esc(fullLabel(N(id))):'').filter(Boolean).join(' + ')} (${n?studentsIn(n).length:0} طالب)</span></span><button class="tb" onclick="editGroup('${g.id}')">✏️ تحرير</button><button class="del" onclick="delGroup('${g.id}')">×</button></li>`}).join(''):'<div class="empty">لا توجد مجموعات</div>';
   document.getElementById('pinState').textContent=S.pin?'الرمز مفعّل ✓':'غير مفعّل — أي أحد يفتح البرنامج يشوف البيانات';
 }
 
@@ -765,8 +779,17 @@ function editNode(id){
   form(isB?'تحرير الدورة':'تحرير الاسم',`<label class="l">${isB?'اسم الدورة':'الاسم'}</label><input id="fName" type="text" value="${esc(n.name)}">`+(isB?`<label class="l">رقم الدورة</label><input id="fNum" type="text" inputmode="numeric" value="${esc(n.num||'')}"><label class="l">مختصر الدورة (يطلع في عمود «دورة» بالكشوف)</label><input id="fAbbr" type="text" value="${esc(n.abbr||'')}" placeholder="مثال: ح.و.ت.د">`:''),
     ()=>{const v=document.getElementById('fName').value.trim();if(v)n.name=v;if(isB){n.num=digits(document.getElementById('fNum').value).trim();n.abbr=document.getElementById('fAbbr').value.trim()}save();renderAll();toast('تم الحفظ ✓ — تغيّر في كل الكشوف')});
 }
+function editGroup(id){const g=id?S.groups.find(x=>x.id===id):{id:uid(),name:'',members:[]},sel=new Set(g.members);
+  const rows=[];const w=(n,d)=>{rows.push(`<label class="chk" style="margin:6px 0;padding-right:${(d-1)*18}px"><input type="checkbox" class="gm" value="${n.id}" ${sel.has(n.id)?'checked':''}> ${esc(label(n))}</label>`);if(d<2)n.children.forEach(c=>w(c,d+1))};S.batches.forEach(b=>w(b,1));
+  form(id?'تحرير المجموعة':'مجموعة جديدة',`<label class="l">اسم المجموعة</label><input id="gName" type="text" value="${esc(g.name)}" placeholder="مثال: الصمود"><label class="l">تشمل:</label><div style="max-height:45vh;overflow:auto">${rows.join('')}</div>`,()=>{
+    const name=document.getElementById('gName').value.trim(),mem=[...document.querySelectorAll('.gm:checked')].map(x=>x.value);
+    if(!name||!mem.length)return toast('اكتب الاسم واختر وحدة على الأقل');
+    // لا تكرار: إذا اخترت دفعة كاملة تنشال سراياها
+    const m2=mem.filter(id=>!mem.some(o=>o!==id&&chain(N(id)).some(x=>x.id===o)));
+    g.name=name;g.members=m2;if(!id)S.groups.push(g);save();renderAll();toast('تم حفظ المجموعة ✓')});}
+function delGroup(id){const g=S.groups.find(x=>x.id===id);ask(`حذف مجموعة «${g.name}»؟ (الطلبة والمواجيد ما تتأثر)`,()=>{S.groups=S.groups.filter(x=>x.id!==id);if(S.scope===id)S.scope='all';save();renderAll()})}
 function delNode(id){const n=N(id),cnt=studentsIn(n).length;
-  ask(`حذف «${label(n)}»${cnt?` وفيها ${cnt} طالب`:''}${n.children.length?' وكل ما تحتها':''}؟`,()=>{const p=IDX[id].p;const arr=p===ROOT?S.batches:p.children;arr.splice(arr.indexOf(n),1);if(!IDX[S.scope]||chain(N(S.scope)).includes(n))S.scope='all';save();renderAll()})}
+  ask(`حذف «${label(n)}»${cnt?` وفيها ${cnt} طالب`:''}${n.children.length?' وكل ما تحتها':''}؟`,()=>{const p=IDX[id].p;const arr=p===ROOT?S.batches:p.children;arr.splice(arr.indexOf(n),1);const gone=new Set();const gw=x=>{gone.add(x.id);x.children.forEach(gw)};gw(n);(S.groups||[]).forEach(g=>g.members=g.members.filter(m=>!gone.has(m)));if(!IDX[S.scope]||chain(N(S.scope)).includes(n))S.scope='all';save();renderAll()})}
 
 /* ---------- نوافذ ---------- */
 function ask(msg,fn){form(msg,'',fn,'نعم')}
@@ -835,7 +858,7 @@ function buildReportPages(){
 
   const p=pages[0],x=p.x;
   T(x,'تقرير الموجود',PW/2,PM+36,{sz:58,b:1,al:'center'});
-  const ch=n===ROOT?[ROOT.name]:chain(n).map(label);
+  const ch=headLines(n);
   T(x,ch[0],PW/2,PM+112,{sz:38,b:1,al:'center',max:PW-2*PM});
   if(ch.length>1)T(x,ch.slice(1).join(' — '),PW/2,PM+164,{sz:32,al:'center'});
   T(x,fmtDate(date),PW/2,PM+(ch.length>1?214:164),{sz:28,c:'#555',al:'center'});
@@ -905,7 +928,7 @@ function dl(f){const a=document.createElement('a');a.href=URL.createObjectURL(f)
 let kLeaf=null;
 function kL(){const all=S.batches.flatMap(leaves);if(!kLeaf||!IDX[kLeaf]||!isLeaf(N(kLeaf))){const n=scopeN();kLeaf=isLeaf(n)?n.id:(leaves(n)[0]||all[0]||{}).id}return kLeaf?N(kLeaf):null}
 function kState(l,s){const k=eff(l,s,curDate);if(k==='abs'||k==='absc')return 'a';if(k)return 'o';const d=l.days[curDate];return d&&d.ok&&d.ok[s.reg]?'p':''}
-function kHeadLines(l){const c=chain(l);return [label(c[0]),...c.slice(1).map(x=>x.name)]}
+function kHeadLines(l){return headLines(l)}
 function renderKashf(){
   const sel=document.getElementById('kSel'),l=kL();
   sel.innerHTML=S.batches.flatMap(leaves).map(x=>`<option value="${x.id}">${esc(fullLabel(x))}</option>`).join('');
@@ -1120,7 +1143,8 @@ const ORDW=[['اول',1],['حادي',1],['ثاني',2],['ثالث',3],['رابع
 function unitNum(v){v=norm(v);const m=v.match(/\d+/);if(m)return +m[0];for(const [w,n] of ORDW)if(v.includes(w))return n;return 0}
 let IMP=null;
 async function impRead(inp){
-  const f=inp.files[0];inp.value='';if(!f)return;
+  const f=inp.files[0];inp.value='';if(!f)return;return impFile(f)}
+async function impFile(f){
   if(/\.xls$/i.test(f.name))return toast('الملف بصيغة xls القديمة — احفظه xlsx وجرب');
   toast('جاري قراءة الملف...');
   let rows;try{rows=/\.(csv|txt)$/i.test(f.name)?readCsv(await f.text()):await readXlsx(await f.arrayBuffer())}
@@ -1162,6 +1186,7 @@ function impExtra(r){const m=IMP.map,g=k=>m[k]>=0?String(r[m[k]]||'').replace(/\
   let memo=g('memo'),st=stKey(g('st')),det=g('det');
   if(!st&&memo&&stKey(memo)&&memo.length<20){st=stKey(memo);memo=''}   // عمود ملاحظات فيه حالة (مثل كشوف الفصائل)
   return {memo,st,since:st?(parseDate(g('sd'))||today()):null,det}}
+function showMsg(t,b){form(t,`<div style="white-space:pre-wrap;line-height:1.8">${esc(b)}</div>`,()=>{},'تمام')}
 function impCompute(){
   const b=N(IMP.batchId),m=IMP.map,split=b.children.length>0,byCols=split&&m.co>=0&&m.pl>=0;
   const seen=new Map(),add=[],dist=new Map(),dups=[],upd=[];let dup=0,bad=0,noUnit=0;
@@ -1198,11 +1223,12 @@ function impRender(){
   document.getElementById('cfMsg').textContent='استيراد الأسماء';document.getElementById('cfBody').innerHTML=h;
   const y=document.getElementById('cfYes');y.textContent=`إضافة ${c.add.length}`;
   if(c.upd.length)y.textContent+=` + تحديث ${c.upd.length}`;
-  y.onclick=()=>{const r=impCompute();if(!r.add.length&&!r.upd.length)return toast('ما فيه أسماء للإضافة');snapshot('قبل استيراد إكسل');
+  y.onclick=()=>{try{const r=impCompute();if(!r.add.length&&!r.upd.length){closeConfirm();return showMsg('ما انضاف أحد',r.dup?`كل الأسماء اللي في الملف (${r.dup}) موجودة مسبقاً في البرنامج بنفس الفصيل، فما تتكرر.\n\nتشوفهم في تبويب «الطلبة» بعد ما تختار الفصيل.`:'ما لقيت أسماء صالحة في الملف (تأكد من عمود رقم التسجيل وعمود الاسم).')}snapshot('قبل استيراد إكسل');
     const mkfx=x=>x.st?[{k:x.st,since:x.since,note:x.det||'',end:null}]:undefined;
     r.add.forEach(x=>{const st={reg:x.reg,name:x.name};if(x.memo)st.memo=x.memo;const fx=mkfx(x);if(fx)st.fx=fx;x.leaf.students.push(st)});
     r.upd.forEach(x=>{if(x.memo)x.s.memo=x.memo;if(x.st){const a=fxActive(x.s,today());if(!a||a.k!==x.st){x.s.fx=(x.s.fx||[]).filter(e=>e.since<x.since);x.s.fx.forEach(e=>{if(!e.end||e.end>x.since)e.end=x.since});x.s.fx.push({k:x.st,since:x.since,note:x.det||'',end:null})}}});
-    save();closeConfirm();renderAll();toast(`تمت إضافة ${r.add.length} طالب`+(r.upd.length?` وتحديث ${r.upd.length}`:'')+' ✓')};
+    save();closeConfirm();const ds=[...r.dist.keys()];setScope(ds.length===1?ds[0].id:IMP.batchId);stLeaf=ds[0]?ds[0].id:stLeaf;renderAll();
+    showMsg('تم الاستيراد ✓',`انضاف ${r.add.length} طالب`+(r.upd.length?` وتحدّث ${r.upd.length}`:'')+(r.dup?`\nتخطيت ${r.dup} موجودين مسبقاً`:'')+`\n\n${ds.map(l=>fullLabel(l)).join('\n')}`)}catch(e){showMsg('صار خطأ أثناء الإضافة',String(e&&e.message||e)+'\n\nصوّر هالرسالة وأرسلها.')}};
 }
 
 /* ---------- كشف المحجوزين ---------- */
@@ -1216,7 +1242,7 @@ function exitTxt(det,it){const d=new Date(det.date+'T12:00');d.setDate(d.getDate
   const dd=String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');return `${w} ${dd} — ${t12(it.time)}`}
 function detStudent(it){const l=IDX[it.leafId]&&N(it.leafId);const st=l&&l.students.find(s=>s.reg===it.reg);return {l:l||null,s:st||{reg:it.reg,name:it.name}}}
 function detRows(det){return det.items.map(it=>({it,...detStudent(it)})).sort((a,b)=>{const A=a.l?info(a.l):{co:0,pl:0},B=b.l?info(b.l):{co:0,pl:0};return (A.co-B.co)||(A.pl-B.pl)||byReg(a.s,b.s)})}
-function defaultBatch(){const n=scopeN();return n===ROOT?(S.batches[0]||{}).id:chain(n)[0].id}
+function defaultBatch(){const n=scopeN();if(n===ROOT)return (S.batches[0]||{}).id;if(n.virtual){const l=leaves(n)[0];return l?chain(l)[0].id:(S.batches[0]||{}).id}return chain(n)[0].id}
 function newDet(){const b=defaultBatch();if(!b)return toast('أضف دفعة من الإعدادات');const d={id:uid(),batchId:b,date:curDate,days:1,time:'16:00',items:[]};S.dets.push(d);save();curDet=d.id;renderDet();window.scrollTo(0,0)}
 function openDet(id){curDet=id;renderDet();window.scrollTo(0,0)}
 function closeDet(){curDet=null;renderDet()}
@@ -1331,7 +1357,8 @@ function replaceNode(t,src){t.students=JSON.parse(JSON.stringify(src.students||[
 function cntSt(n){return (n.students||[]).length+(n.children||[]).reduce((a,c)=>a+cntSt(c),0)}
 let PIMP=null;
 function importData(inp){
-  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  const f=inp.files[0];if(!f)return;
+  if(/\.(xlsx|xls|csv)$/i.test(f.name)){inp.value='';toast('هذا ملف إكسل — راح أفتحه في استيراد الأسماء');go('students');return impFile(f)}const r=new FileReader();
   r.onload=()=>{inp.value='';let d;try{d=JSON.parse(r.result)}catch(e){return toast('ملف غير صالح')}
     if(d.courses&&!d.batches)d={v:2,scope:'all',pin:d.pin||null,batches:d.courses.map(c=>({id:c.id,name:c.name,num:'',children:[],students:c.students,days:c.days||{}}))};
     // قائمة الوحدات الموجودة في الملف
@@ -1390,6 +1417,8 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!reloading){reloading=true;location.reload()}});
 }
 
+window.addEventListener('error',e=>{try{toast('خطأ: '+(e.message||'غير معروف'))}catch(_){}});
+window.addEventListener('unhandledrejection',e=>{try{toast('خطأ: '+((e.reason&&e.reason.message)||e.reason))}catch(_){}});
 /* ---------- تشغيل ---------- */
 load();
 versionCheck();
