@@ -155,6 +155,7 @@ nav button{font-size:11px}
 <main>
 <!-- ======= الموجود ======= -->
 <section class="view on" id="v-today">
+  <button class="btn sec full" style="margin-bottom:12px" onclick="openMsg()">📩 تحديث الموجود من رسالة</button>
   <div class="card" id="dueBar" style="display:none;background:#fff4e0;border-color:#f0d39a;color:#7a5410;font-size:14px;cursor:pointer;padding:12px 14px" onclick="openDue()"></div>
   <div class="stats">
     <div class="stat"><span>العام</span><b id="sTotal">0</b></div>
@@ -448,6 +449,18 @@ nav button{font-size:11px}
     <button class="btn sec full" style="margin-top:12px" onclick="closeDue()">إغلاق</button>
   </div>
 </div>
+<div class="sheet-bg" id="msgSheet" onclick="if(event.target===this)closeMsg()">
+  <div class="sheet">
+    <h3>📩 تحديث الموجود من رسالة</h3>
+    <div class="sub">الصق رسالة الموجود (من الواتساب) والبرنامج يقرأها ويعدّل الموجود.</div>
+    <div id="msgStep1">
+      <textarea id="msgTxt" rows="9" placeholder="الصق الرسالة هنا..."></textarea>
+      <button class="btn full" style="margin-top:10px" onclick="readMsg()">قراءة الرسالة</button>
+    </div>
+    <div id="msgStep2" style="display:none"></div>
+    <button class="btn sec full" style="margin-top:10px" onclick="closeMsg()">إغلاق</button>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <div id="upd"><b>🔄 يوجد تحديث جديد للبرنامج</b><button onclick="applyUpdate()">تحديث الآن</button></div>
 
@@ -466,7 +479,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.12.0';
+const APP_VERSION='1.13.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -985,6 +998,98 @@ async function kPdfFile(){if(document.fonts&&document.fonts.ready)await document
   return new File([makePDF(kPages())],`كشف-${chain(l).map(shortName).join('-')}-${curDate}.pdf`.replace(/[\\/:*?"<>|]/g,'-'),{type:'application/pdf'})}
 async function kPdfShare(){if(!kL())return;try{const f=await kPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function kPdfSave(){if(!kL())return;try{dl(await kPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
+
+/* ---------- تحديث الموجود من رسالة واتساب ---------- */
+let MSG=null;
+function openMsg(){document.getElementById('msgStep1').style.display='';document.getElementById('msgStep2').style.display='none';document.getElementById('msgSheet').classList.add('on')}
+function closeMsg(){document.getElementById('msgSheet').classList.remove('on')}
+const ORDN=[['اول',1],['اولي',1],['ثاني',2],['ثانيه',2],['ثالث',3],['ثالثه',3],['رابع',4],['رابعه',4],['خامس',5],['سادس',6]];
+function ordIn(t){t=norm(t).replace(/^ال/,'');for(const [w,n] of ORDN.slice().sort((a,b)=>b[0].length-a[0].length))if(t.startsWith(w))return n;const m=t.match(/\d+/);return m?+m[0]:0}
+const MSTAT=[['لم يلتحق','nj'],['غياب مستمر','absc'],['غياب','abs'],['اعتذار','resign'],['راحه','home'],['مستشفي','hosp'],['مراجعه','ext'],['اختبار','exam'],['مفصول','fired'],['فصل','fired']];
+function mStat(n){for(const [w,k] of MSTAT)if(n.includes(w))return k;return null}
+function ymd(y,m,d){return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+// تاريخ مثل 11/4: نختار التفسير (يوم/شهر أو شهر/يوم) الأقرب لتاريخ الرسالة
+function mDate(a,b,ref){const y=+ref.slice(0,4),c=[];if(b<=12&&a<=31)c.push(ymd(y,b,a));if(a<=12&&b<=31)c.push(ymd(y,a,b));if(!c.length)return null;return c.sort((p,q)=>Math.abs(diffDays(ref,p))-Math.abs(diffDays(ref,q)))[0]}
+function parseMsg(txt){
+  const L=txt.split(/\r?\n/).map(l=>l.replace(/[‎‏‪-‮⁦-⁩⁠*_~]/g,'').trim());
+  const all=norm(txt.replace(/[‎‏]/g,''));let date=null;
+  for(const l of L){const n=digits(l);if(/الموافق|يوم|بتاريخ/.test(norm(l))){const m=n.match(/(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/);if(m){date=ymd(m[3],m[2],m[1]);break}}}
+  const ref=date||curDate;
+  let batch=null;if(/رقبا|ط\s*\.?\s*ض\s*\.?\s*ص/.test(all))batch=S.batches.find(b=>/رقبا/.test(norm(b.name)));
+  if(/اغرار|ح\s*\.?\s*و\s*\.?\s*ت\s*\.?\s*د/.test(all))batch=S.batches.find(b=>/اغرار|حارس/.test(norm(b.name)))||batch;
+  if(!batch)batch=chain(leaves(scopeN())[0]||S.batches.flatMap(leaves)[0])[0];
+  const flat=!batch.children.length,secs=new Map();let co=0,pl=0,pend=null;
+  const sec=()=>{const key=flat?'flat':co+'|'+pl;if(!secs.has(key)){let leaf=null;if(flat)leaf=batch;else{const c=batch.children[co-1];leaf=c&&(c.children.length?c.children[pl-1]:c)||null}secs.set(key,{co,pl,leaf,total:null,present:null,items:[]})}return secs.get(key)};
+  const STOP=/^(من|الي|الى|إلى|تاريخ|موسيقي|موسيقى|جديد|عن|دوره|بالمنزل|راحه|لم|يلتحق|غياب|مستمر|اعتذار|مستشفي|مراجعه|خارجيه|اختبار|فصل|مفصول|دخول)$/;
+  for(const raw of L){if(!raw)continue;const n=norm(raw),d=digits(raw);
+    if(/السري[هة]|سريه/.test(n)&&!/\+/.test(n)&&!/ح\s*و\s*ت/.test(n)){const m=n.match(/سري[هة]\s*(\S+)/);if(m){co=ordIn(m[1]);pl=0}continue}
+    if(/الفصيل/.test(n)&&!mStat(n)){const m=n.match(/الفصيل\s*(\S+)/);if(m){pl=ordIn(m[1])}continue}
+    const inSec=flat||(co&&pl);
+    let m;if((m=n.match(/الموجود\s*العام\s*:?\s*(\d+)/))){if(inSec)sec().total=+m[1];continue}
+    if((m=n.match(/الموجود\s*الحالي\s*:?\s*(\d+)/))){if(inSec)sec().present=+m[1];continue}
+    if(/المتفرقه|ـ/.test(n)&&!/\d{2,}.*\(/.test(n)&&/:/.test(n))continue;
+    if(!inSec)continue;
+    let st=mStat(n);
+    // التواريخ (من ... الى ...)
+    const dm1=d.match(/من\s*(?:تاريخ)?\s*(\d{1,2})\s*\/\s*(\d{1,2})/),dm2=d.match(/(?:الي|الى|إلى|لين)\s*(?:تاريخ)?\s*(\d{1,2})\s*\/\s*(\d{1,2})/);
+    let rest=d.replace(/\d{1,2}\s*\/\s*\d{1,2}(\s*\/\s*\d{2,4})?/g,' ').replace(/^[\s.\-]*\d+\s*[.\-)]?\s*/,' ');
+    const nums=rest.match(/\d{2,}/g),reg=nums?nums[0]:null;
+    const hasAb=/ح\s*\.?\s*و\s*\.?\s*ت\s*\.?\s*د|ط\s*\.?\s*ض\s*\.?\s*ص/.test(n);
+    const name=norm(rest.replace(/ح\s*[.\s]*و\s*[.\s]*ت\s*[.\s]*د\.?|ط\s*[.\s]*ض\s*[.\s]*ص\.?/g,' ')).replace(/[^؀-ۿ\s]/g,' ').split(/\s+/).filter(w=>w.length>=2&&!STOP.test(w));
+    const from=dm1?mDate(+dm1[1],+dm1[2],ref):null,to=dm2?mDate(+dm2[1],+dm2[2],ref):null;
+    if(!st&&(reg||hasAb)&&name.length){pend={reg,name,raw};continue}           // الحالة في السطر اللي بعده
+    if(st&&!reg&&!name.length&&pend){sec().items.push({...pend,st,from,to,raw:pend.raw+' / '+raw});pend=null;continue}
+    if(st&&(reg||name.length>=2)){sec().items.push({reg,name,st,from,to,raw});pend=null}
+  }
+  // مطابقة الطالب
+  const toks=s=>norm(s.name).replace(/عبد\s+/g,'عبد').split(/\s+/);
+  const score=(nm,s)=>{const t=toks(s);return nm.map(w=>w.replace(/^عبد\s*/,'عبد')).filter(w=>t.includes(w)).length};
+  secs.forEach(S_=>{S_.items.forEach(it=>{const nm=it.name.join(' ').replace(/عبد\s+/g,'عبد').split(' ');
+    const find=pool=>{let c=it.reg?pool.filter(x=>x.s.reg.endsWith(it.reg)):[];if(c.length>1)c.sort((a,b)=>score(nm,b.s)-score(nm,a.s));if(c.length)return c[0];
+      const sc=pool.map(x=>({x,v:score(nm,x.s)})).filter(o=>o.v>=2).sort((a,b)=>b.v-a.v);return sc.length&&(sc.length===1||sc[0].v>sc[1].v)?sc[0].x:null};
+    let hit=S_.leaf?find(S_.leaf.students.map(s=>({s,l:S_.leaf}))):null;
+    if(!hit){hit=find(studentsIn(batch));if(hit)it.moved=1}
+    it.hit=hit})});
+  return {date:ref,dateFound:!!date,batch,secs:[...secs.values()].filter(x=>x.leaf)};
+}
+function readMsg(){const t=document.getElementById('msgTxt').value;if(!t.trim())return toast('الصق الرسالة أول');
+  try{MSG=parseMsg(t);MSG.ret=true;MSG.setPres=true;renderMsg()}catch(e){showMsg('تعذر قراءة الرسالة',String(e.message||e))}}
+function msgPlan(){const P=MSG,D=P.date,out=[];
+  P.secs.forEach(x=>{const l=x.leaf,listed=new Set();const ch=[],ok=[],miss=[],back=[];
+    x.items.forEach(it=>{if(!it.hit){miss.push(it);return}const s=it.hit.s;listed.add(it.hit.l.id+'|'+s.reg);const cur=eff(it.hit.l,s,D);
+      if(cur===it.st&&!(it.st==='home'&&it.from))ok.push(it);else ch.push({...it,cur})});
+    if(P.ret)l.students.forEach(s=>{if(!listed.has(l.id+'|'+s.reg)&&eff(l,s,D))back.push({s,l,cur:eff(l,s,D)})});
+    out.push({x,l,ch,ok,miss,back})});return out}
+function renderMsg(){const P=MSG,plan=msgPlan(),st=document.getElementById('msgStep2');
+  document.getElementById('msgStep1').style.display='none';st.style.display='';
+  let h=`<div class="row"><div><label class="l" style="margin-top:0">تاريخ الموجود</label><input type="date" value="${P.date}" onchange="MSG.date=this.value;renderMsg()"></div></div>
+  <div class="small" style="margin:6px 0">${P.dateFound?'':'⚠️ ما لقيت تاريخ في الرسالة — استخدمت التاريخ المختار. '}الدفعة: <b>${esc(label(P.batch))}</b> · ${P.secs.length} ${P.batch.children.length?'فصيل':'قسم'}</div>
+  <label class="chk"><input type="checkbox" ${P.ret?'checked':''} onchange="MSG.ret=this.checked;renderMsg()"> اللي مو مذكورين في الرسالة يرجعون موجود (في الفصائل المذكورة فقط)</label>
+  <label class="chk"><input type="checkbox" ${P.setPres?'checked':''} onchange="MSG.setPres=this.checked;renderMsg()"> خذ «الموجود الحالي» من الرسالة</label>`;
+  let nC=0,nB=0,nM=0;
+  plan.forEach(p=>{nC+=p.ch.length;nB+=p.back.length;nM+=p.miss.length;const k=calc(p.l,P.date);
+    const tw=p.x.total!=null&&p.x.total!==p.l.students.length?`<div class="small" style="color:var(--warn)">⚠️ العام في الرسالة ${p.x.total} — في البرنامج ${p.l.students.length}</div>`:'';
+    h+=`<div class="card" style="margin:10px 0 0;padding:10px 12px"><b>${esc(relLabel(p.l,P.batch)||label(p.l))}</b> <span class="small">· الحالي في الرسالة: ${p.x.present??'—'} · المتفرقة بالرسالة: ${p.x.items.length}</span>${tw}`+
+      (p.ch.length?`<div class="small" style="margin-top:6px;line-height:1.8">${p.ch.map(c=>`✏️ ${esc(c.hit.s.reg)} ${esc(c.hit.s.name)}: ${c.cur?RMAP[c.cur].t+' ← ':''}<b>${RMAP[c.st].t}</b>${c.from?` من ${dm(c.from)}`:''}${c.to?` إلى ${dm(c.to)}`:''}${c.moved?' <span style="color:var(--warn)">(في فصيل ثاني بالبرنامج)</span>':''}`).join('<br>')}</div>`:'')+
+      (p.back.length?`<div class="small" style="margin-top:6px;line-height:1.8;color:var(--pri)">${p.back.map(b=>`↩️ ${esc(b.s.reg)} ${esc(b.s.name)}: ${RMAP[b.cur].t} ← <b>موجود</b>`).join('<br>')}</div>`:'')+
+      (p.miss.length?`<div class="small" style="margin-top:6px;line-height:1.8;color:var(--warn)">${p.miss.map(m=>`❓ ما لقيته: ${esc(m.raw)}`).join('<br>')}</div>`:'')+
+      (p.ok.length?`<div class="small" style="margin-top:4px">✓ ${p.ok.length} بدون تغيير</div>`:'')+`</div>`});
+  h+=`<div class="card" style="margin:12px 0 0;background:#fafaf8"><b>التغييرات: ${nC} تعديل · ${nB} يرجعون موجود</b>${nM?`<div class="small" style="color:var(--warn)">❓ ${nM} سطر ما قدرت أطابقه — عدّلهم يدوي</div>`:''}</div>
+  <button class="btn full" style="margin-top:10px" onclick="applyMsg()">✅ تطبيق التعديلات</button>
+  <button class="btn sec full" style="margin-top:8px" onclick="openMsg()">↩ تعديل الرسالة</button>`;
+  st.innerHTML=h}
+function applyMsg(){try{const P=MSG,D=P.date,plan=msgPlan();snapshot('قبل تحديث من رسالة');let n=0;
+  const endAct=(s,day)=>{const a=fxActive(s,day);if(!a)return;if(a.since>=day)s.fx.splice(s.fx.indexOf(a),1);else a.end=day};
+  plan.forEach(p=>{
+    p.ch.forEach(c=>{const {s,l}=c.hit,r=RMAP[c.st];s.fx=s.fx||[];const dd=l.days[D];if(dd)delete dd.abs[s.reg];
+      if(!r.fx){if(!l.days[D])l.days[D]={present:null,abs:{}};endAct(s,D);l.days[D].abs[s.reg]=c.st;n++;return}
+      const since=c.from||D;endAct(s,since<D?since:D);s.fx=s.fx.filter(e=>!(e.since>=since));
+      const e={k:c.st,since,note:'',end:null};if(c.to){e.days=diffDays(since,c.to)+1;e.due=addDays(c.to,1)}else if(r.fx==='days'){e.days=c.st==='home'?3:1;e.due=addDays(since,e.days)}
+      s.fx.push(e);n++});
+    p.back.forEach(b=>{const dd=b.l.days[D];if(dd)delete dd.abs[b.s.reg];endAct(b.s,D);n++});
+    if(P.setPres&&p.x.present!=null){if(!p.l.days[D])p.l.days[D]={present:null,abs:{}};p.l.days[D].present=p.x.present}
+  });
+  save();closeMsg();curDate=D;renderAll();showMsg('تم التحديث ✓',`تم تطبيق ${n} تعديل بتاريخ ${dm(D)}.\nتقدر ترجع لما قبل من الإعدادات ← استرجاع نسخة تلقائية.`)}catch(e){showMsg('صار خطأ',String(e.message||e))}}
 
 /* ---------- تقرير خاص ---------- */
 function specSel(){if(!Array.isArray(S.spec))S.spec=['hosp','home','abs'];return S.spec}
