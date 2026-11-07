@@ -272,7 +272,9 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
   </div>
   <div class="card">
     <b>النسخ الاحتياطي</b>
-    <p class="small">البيانات محفوظة على جوالك فقط. خذ نسخة احتياطية بين فترة وفترة.</p>
+    <p class="small">البيانات محفوظة على جوالك فقط. خذ نسخة احتياطية بين فترة وفترة. تقدر تصدّر وتستورد دورة أو سرية أو فصيل لحاله بدون ما يتأثر الباقي.</p>
+    <label class="l" style="margin-top:0">نطاق التصدير</label>
+    <select id="expScope" style="margin-bottom:10px"></select>
     <div class="row">
       <button class="btn sec" onclick="exportData()">تصدير نسخة</button>
       <button class="btn sec" onclick="document.getElementById('impFile').click()">استيراد نسخة</button>
@@ -397,7 +399,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» · days = عدد أيام ثم يرجع تلقائي · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.6.1';
+const APP_VERSION='1.7.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -561,6 +563,7 @@ function renderSettings(){
   let sn=null;try{sn=JSON.parse(localStorage.getItem(SNAP))}catch(e){}
   document.getElementById('verInfo').textContent=`نسخة البرنامج: ${APP_VERSION}`+(sn?` · آخر نسخة تلقائية للبيانات: ${sn.at} (${sn.why})`:'');
   document.getElementById('restoreBtn').style.display=sn?'':'none';
+  {const e=document.getElementById('expScope'),v=e.value;e.innerHTML=scopeOptions(null).replace('📋 جميع الدفعات','📋 جميع الدفعات (نسخة كاملة)');e.value=IDX[v]?v:'all'}
   document.getElementById('pinState').textContent=S.pin?'الرمز مفعّل ✓':'غير مفعّل — أي أحد يفتح البرنامج يشوف البيانات';
 }
 
@@ -1086,16 +1089,52 @@ document.getElementById('lockIn').addEventListener('keydown',e=>{if(e.key==='Ent
 
 /* ---------- النسخ الاحتياطي ---------- */
 function exportData(){
-  const name=`مواجيد-نسخة-${today()}.json`,file=new File([JSON.stringify(S)],name,{type:'application/json'});
+  const id=document.getElementById('expScope').value||'all',n=N(id);let payload,nm;
+  if(n===ROOT){payload=S;nm=`مواجيد-نسخة-كاملة-${today()}.json`}
+  else{payload={kind:'mawajeed-part',v:3,at:today(),id:n.id,path:chain(n).map(label),height:height(n),node:JSON.parse(JSON.stringify(n))};
+    nm=`مواجيد-${chain(n).map(shortName).join('-')}-${today()}.json`}
+  const file=new File([JSON.stringify(payload)],nm.replace(/[\\/:*?"<>|]/g,'-'),{type:'application/json'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(()=>{});return}dl(file);
 }
+function height(n){return n.children&&n.children.length?1+Math.max(...n.children.map(height)):0}
+function reid(n){n.id=uid();(n.children||[]).forEach(reid);return n}
+// يستبدل بيانات الوحدة الهدف فقط (الطلبة والمواجيد والحالات) ويحافظ على باقي الوحدات
+function replaceNode(t,src){t.students=JSON.parse(JSON.stringify(src.students||[]));t.days=JSON.parse(JSON.stringify(src.days||{}));
+  const sc=src.children||[];
+  if(sc.length===t.children.length)t.children.forEach((c,i)=>replaceNode(c,sc[i]));
+  else t.children=sc.map(c=>reid(JSON.parse(JSON.stringify(c))));
+}
+function cntSt(n){return (n.students||[]).length+(n.children||[]).reduce((a,c)=>a+cntSt(c),0)}
+let PIMP=null;
 function importData(inp){
   const f=inp.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{let d=JSON.parse(r.result);
-      if(d.courses&&!d.batches)d={v:2,scope:'all',pin:d.pin||null,batches:d.courses.map(c=>({id:c.id,name:c.name,num:'',children:[],students:c.students,days:c.days||{}}))};
-      if(!d.batches)throw 0;
-      ask('استبدال البيانات الحالية بالنسخة المستوردة؟',()=>{S=d;save();load();renderAll();toast('تم الاستيراد ✓')})}catch(e){toast('ملف غير صالح')}inp.value=''};
+  r.onload=()=>{inp.value='';let d;try{d=JSON.parse(r.result)}catch(e){return toast('ملف غير صالح')}
+    if(d.courses&&!d.batches)d={v:2,scope:'all',pin:d.pin||null,batches:d.courses.map(c=>({id:c.id,name:c.name,num:'',children:[],students:c.students,days:c.days||{}}))};
+    // قائمة الوحدات الموجودة في الملف
+    const src=[];
+    if(d.kind==='mawajeed-part'&&d.node){const w=(n,p)=>{src.push({n,label:p.join(' — ')});(n.children||[]).forEach(c=>w(c,[...p,c.name]))};w(d.node,d.path)}
+    else if(d.batches){src.push({all:1,label:'📋 جميع الدفعات (استبدال كل البيانات)'});const w=(n,p,dep)=>{const lb=dep===1&&n.num?`${n.name} (${n.num})`:n.name;src.push({n,label:[...p,lb].join(' — ')});(n.children||[]).forEach(c=>w(c,[...p,lb],dep+1))};d.batches.forEach(b=>w(b,[],1))}
+    else return toast('ملف غير صالح');
+    PIMP={d,src,si:d.kind==='mawajeed-part'?0:0,ti:null};
+    partRender();document.getElementById('confirm').classList.add('on');
+  };
   r.readAsText(f);
+}
+function partTargets(sn){const h=height(sn);const out=[];const w=n=>{if(height(n)===h)out.push(n);n.children.forEach(w)};S.batches.forEach(w);return out}
+function partRender(){
+  const P=PIMP,cur=P.src[P.si];let h=`<label class="l" style="margin-top:0">وش تستورد من الملف؟</label><select onchange="PIMP.si=+this.value;PIMP.ti=null;partRender()">${P.src.map((x,i)=>`<option value="${i}" ${i===P.si?'selected':''}>${esc(x.label)}${x.all?'':` (${cntSt(x.n)} طالب)`}</option>`).join('')}</select>`;
+  const y=document.getElementById('cfYes');
+  if(cur.all){h+=`<p class="note bad" style="text-align:right">⚠️ هذا يستبدل كل البيانات في جوالك بالنسخة المستوردة.</p>`;
+    y.textContent='استبدال الكل';y.onclick=()=>{closeConfirm();snapshot('قبل استيراد نسخة كاملة');S=P.d;save();load();renderAll();toast('تم الاستيراد ✓')}}
+  else{const tg=partTargets(cur.n);
+    if(!tg.length){h+=`<p class="note bad">ما فيه وحدة مطابقة في جوالك.</p>`;y.textContent='—';y.onclick=()=>{}}
+    else{if(P.ti===null){const byId=tg.findIndex(t=>t.id===cur.n.id),byName=tg.findIndex(t=>fullLabel(t)===cur.label);P.ti=byId>=0?byId:byName>=0?byName:0}
+      const t=tg[P.ti];
+      h+=`<label class="l">تنحط بدل بيانات:</label><select onchange="PIMP.ti=+this.value;partRender()">${tg.map((x,i)=>`<option value="${i}" ${i===P.ti?'selected':''}>${esc(fullLabel(x))} (${cntSt(x)} طالب حالياً)</option>`).join('')}</select>
+      <div class="card" style="margin:12px 0 0;background:#fafaf8"><b>${esc(fullLabel(t))}</b><div class="small" style="margin-top:6px;line-height:1.8">
+      يتم استبدال طلبتها ومواجيدها (${cntSt(t)} طالب حالياً) بالنسخة المستوردة (${cntSt(cur.n)} طالب).<br>✓ باقي الدورات والسرايا والفصائل ما تتأثر.<br>✓ تنحفظ نسخة تلقائية قبل الاستيراد.</div></div>`;
+      y.textContent='استيراد';y.onclick=()=>{closeConfirm();snapshot('قبل استيراد '+t.name);replaceNode(t,cur.n);save();renderAll();toast(`تم استيراد ${fullLabel(t)} ✓`)}}}
+  document.getElementById('cfMsg').textContent='استيراد نسخة';document.getElementById('cfBody').innerHTML=h;
 }
 
 /* ---------- التحديث وحماية البيانات ---------- */
