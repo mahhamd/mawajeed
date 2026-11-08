@@ -114,9 +114,9 @@ pre.rep{white-space:pre-wrap;font-family:inherit;background:#fafaf8;border:1px s
 #fab.hide{display:none}
 .tb.ret{background:var(--pri);color:#fff}
 .pres{display:flex;align-items:center;gap:2px}
-.pres button{border:none;background:var(--pri2);color:var(--pri);border-radius:8px;width:26px;height:32px;font-size:12px;flex:0 0 auto;padding:0}
+.pres button{border:none;background:var(--pri2);color:var(--pri);border-radius:8px;width:22px;height:32px;font-size:11px;flex:0 0 auto;padding:0}
 .pres button:active{background:var(--pri);color:#fff}
-.pres input{min-width:0}
+.pres input{min-width:0;flex:1;width:100%;font-size:22px!important;padding:2px 0!important}
 #fab[data-badge]:not([data-badge=''])::after{content:attr(data-badge);position:absolute;top:-6px;right:-6px;background:#d9822b;color:#fff;border-radius:12px;min-width:22px;height:22px;font-size:13px;line-height:22px;text-align:center;padding:0 5px}
 .kr{display:block!important;cursor:default!important}
 .kr .top{display:flex;align-items:center;gap:8px}
@@ -217,6 +217,7 @@ nav button{font-size:11px}
     <select id="scopeSel2" onchange="setScope(this.value)"></select>
   </div>
   <div class="card">
+    <div class="seg" style="margin-top:0"><button id="rdD" onclick="setRepDetail(true)">مع التفاصيل<br><small>الأيام والتواريخ والسبب</small></button><button id="rdS" onclick="setRepDetail(false)">مختصر<br><small>الأسماء وأرقام التسجيل فقط</small></button></div>
     <pre class="rep" id="repText"></pre>
     <button class="btn full" style="margin-top:12px" onclick="pdfShare()">📄 إرسال PDF (واتساب)</button>
     <div class="row" style="margin-top:8px">
@@ -480,7 +481,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.14.0';
+const APP_VERSION='1.15.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -547,6 +548,9 @@ function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
   if(due){const n=f.days||diffDays(f.since,due);t=(f.k==='home'?'راحة ':f.k==='ext'?'مراجعة ':f.k==='death'?'إجازة وفاة ':'مدة متوقعة ')+`${daysTxt(n)} من ${dm(f.since)} إلى ${dm(addDays(due,-1))} — العودة ${dm(due)}`+(late?' (انتهت المدة)':'')}
   else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
   return (f.cause?(f.k==='death'?'':'السبب: ')+f.cause+' — ':'')+(f.note?f.note+' — ':'')+t}
+// في التقارير: «مختصر» = الأسماء وأرقام التسجيل فقط بدون أيام وتواريخ وملاحظات
+function repNote(s,date){return S.repDetail===false?'':fullNote(s,date)}
+function setRepDetail(v){S.repDetail=v;save();renderReport()}
 function fullNote(s,date){return [s.memo,noteOf(s,date)].filter(Boolean).join(' — ')}
 function hasPresent(d){return d.present!==null&&d.present!==undefined&&d.present!==''}
 function calc(n,date=curDate){
@@ -616,13 +620,14 @@ function reportText(n=scopeN(),date=curDate){
   if(!leaf&&n.children.length){t+='\n*التوزيع*\n'+n.children.map(c=>{const q=calc(c,date);return `${label(c)}: ع ${q.total} | ح ${q.present} | م ${q.absent}`}).join('\n')+'\n'}
   REASONS.forEach(r=>{
     const list=studentsIn(n).filter(x=>eff(x.l,x.s,date)===r.k).sort((a,b)=>byReg(a.s,b.s));
-    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(fullNote(x.s,date)?`\n   ${fullNote(x.s,date)}`:'')).join('\n')+'\n';
+    if(list.length)t+=`\n*${r.t}* (${list.length})\n`+list.map((x,i)=>`${i+1}- ${tag(x)}`+(repNote(x.s,date)?`\n   ${repNote(x.s,date)}`:'')).join('\n')+'\n';
   });
   if(k.marked!==k.absent)t+=`\n⚠️ المسجّل سببهم ${k.marked} من ${k.absent}`;
   if(!leaf&&k.pending)t+=`\n⚠️ لم يُدخل الحالي في ${k.pending} من ${k.units} (محسوب من المتفرقة المسجّلة)`;
   return t.trim();
 }
 function renderReport(){
+  {const d=S.repDetail!==false;document.getElementById('rdD').classList.toggle('on',d);document.getElementById('rdS').classList.toggle('on',!d)}
   renderSpec();
   document.getElementById('repText').textContent=reportText();
   const n=scopeN(),ds=new Set();
@@ -844,7 +849,7 @@ function sectionPages(head,sub,cols,rows,foot,land){
 }
 function buildReportPages(){
   const n=scopeN(),date=curDate,k=calc(n,date),leaf=isLeaf(n),sub=`${fullLabel(n)} — ${fmtDate(date)}`;
-  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>eff(x.l,x.s,date),nt=x=>fullNote(x.s,date);
+  const all=studentsIn(n).sort((a,b)=>byReg(a.s,b.s)),ab=x=>eff(x.l,x.s,date),nt=x=>repNote(x.s,date);
   const status=x=>ab(x)?RMAP[ab(x)].t:'موجود';
   const pages=[pgNew()],start={};const add=(key,pp)=>{start[key]=pages.length;pages.push(...pp)};
   const hasCo=all.some(x=>info(x.l).co);
@@ -1101,7 +1106,7 @@ function specTitle(){const a=REASONS.filter(r=>specSel().includes(r.k)).map(r=>r
 function specText(){const n=scopeN(),rows=specRows(),sel=REASONS.filter(r=>specSel().includes(r.k));
   let t=`*تقرير ${specTitle()}*\n${fullLabel(n)}\n${fmtDate(curDate)}\n\n`;
   t+=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('\n')+`\nالمجموع: ${rows.length}\n`;
-  sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(fullNote(x.s,curDate)?`\n   ${fullNote(x.s,curDate)}`:'')).join('\n')+'\n'});
+  sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(repNote(x.s,curDate)?`\n   ${repNote(x.s,curDate)}`:'')).join('\n')+'\n'});
   return t.trim()}
 function specMode(){return S.specMode==='gen'?'gen':'cur'}
 function setSpecMode(m){S.specMode=m;save();renderSpec()}
@@ -1165,10 +1170,10 @@ function renderSpec(){const sel=specSel(),gen=specMode()==='gen';
 function specReady(){if(!specSel().length){toast('اختر نوع واحد على الأقل');return false}return true}
 async function specTextShare(){if(!specReady())return;const t=specMode()==='gen'?genText():specText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
 function specPages(){
-  const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>fullNote(x.s,curDate));
+  const n=scopeN(),rows=specRows(),W=PH,H=PW,inner=W-2*PM,RH=58,hasCo=rows.some(x=>info(x.l).co),anyN=rows.some(x=>repNote(x.s,curDate));
   const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),{t:'نوع المتفرقة',w:200,al:1},...(anyN?[{t:'ملاحظة',w:640}]:[])];
   const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
-  const data=rows.map((x,i)=>{const f=info(x.l);return [i+1,f.abbr,x.s.reg,x.s.name,...(hasCo?[f.co,f.pl]:[]),x.r.t,...(anyN?[fullNote(x.s,curDate)]:[])]});
+  const data=rows.map((x,i)=>{const f=info(x.l);return [i+1,f.abbr,x.s.reg,x.s.name,...(hasCo?[f.co,f.pl]:[]),x.r.t,...(anyN?[repNote(x.s,curDate)]:[])]});
   const sel=REASONS.filter(r=>specSel().includes(r.k)),sum=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('   ·   ')+`   ·   المجموع: ${rows.length}`;
   const out=[];let p,x,y,part=0;
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
