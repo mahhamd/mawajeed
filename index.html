@@ -217,7 +217,9 @@ nav button{font-size:11px}
     <select id="scopeSel2" onchange="setScope(this.value)"></select>
   </div>
   <div class="card">
-    <div class="seg" style="margin-top:0"><button id="rdD" onclick="setRepDetail(true)">مع التفاصيل<br><small>الأيام والتواريخ والسبب</small></button><button id="rdS" onclick="setRepDetail(false)">مختصر<br><small>الأسماء وأرقام التسجيل فقط</small></button></div>
+    <label class="l" style="margin-top:0">جملة ثابتة تحت العنوان والتاريخ (اختياري)</label>
+    <textarea id="repLine" rows="2" placeholder="مثال: موجود الفترة المسائية — معسكر الصمود" oninput="setRepLine(this.value)"></textarea>
+    <div class="seg"><button id="rdD" onclick="setRepDetail(true)">مع التفاصيل<br><small>الأيام والتواريخ والسبب</small></button><button id="rdS" onclick="setRepDetail(false)">مختصر<br><small>الأسماء وأرقام التسجيل فقط</small></button></div>
     <pre class="rep" id="repText"></pre>
     <button class="btn full" style="margin-top:12px" onclick="pdfShare()">📄 إرسال PDF (واتساب)</button>
     <div class="row" style="margin-top:8px">
@@ -481,7 +483,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.15.0';
+const APP_VERSION='1.16.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -549,6 +551,10 @@ function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
   else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
   return (f.cause?(f.k==='death'?'':'السبب: ')+f.cause+' — ':'')+(f.note?f.note+' — ':'')+t}
 // في التقارير: «مختصر» = الأسماء وأرقام التسجيل فقط بدون أيام وتواريخ وملاحظات
+// جملة ثابتة تطلع تحت العنوان والتاريخ في كل التقارير
+function fixLines(){return String(S.repLine||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
+function fixTxt(){const l=fixLines();return l.length?l.join('\n')+'\n':''}
+function setRepLine(v){S.repLine=v;save();document.getElementById('repText').textContent=reportText();try{renderSpec()}catch(e){}}
 function repNote(s,date){return S.repDetail===false?'':fullNote(s,date)}
 function setRepDetail(v){S.repDetail=v;save();renderReport()}
 function fullNote(s,date){return [s.memo,noteOf(s,date)].filter(Boolean).join(' — ')}
@@ -615,7 +621,7 @@ function renderList(){
 }
 function reportText(n=scopeN(),date=curDate){
   const k=calc(n,date),leaf=isLeaf(n);
-  let t=`*موجود ${fullLabel(n)}*\n${fmtDate(date)}\n\nالعام: ${k.total}\nالحالي: ${k.present}\nالمتفرقة: ${k.absent}\n`;
+  let t=`*موجود ${fullLabel(n)}*\n${fmtDate(date)}\n${fixTxt()}\nالعام: ${k.total}\nالحالي: ${k.present}\nالمتفرقة: ${k.absent}\n`;
   if(k.absent)t+=REASONS.filter(r=>k.by[r.k]).map(r=>`- ${r.t}: ${k.by[r.k]}`).join('\n')+'\n';
   if(!leaf&&n.children.length){t+='\n*التوزيع*\n'+n.children.map(c=>{const q=calc(c,date);return `${label(c)}: ع ${q.total} | ح ${q.present} | م ${q.absent}`}).join('\n')+'\n'}
   REASONS.forEach(r=>{
@@ -627,6 +633,7 @@ function reportText(n=scopeN(),date=curDate){
   return t.trim();
 }
 function renderReport(){
+  {const e=document.getElementById('repLine');if(document.activeElement!==e)e.value=S.repLine||''}
   {const d=S.repDetail!==false;document.getElementById('rdD').classList.toggle('on',d);document.getElementById('rdS').classList.toggle('on',!d)}
   renderSpec();
   document.getElementById('repText').textContent=reportText();
@@ -881,7 +888,8 @@ function buildReportPages(){
   T(x,ch[0],PW/2,PM+112,{sz:38,b:1,al:'center',max:PW-2*PM});
   if(ch.length>1)T(x,ch.slice(1).join(' — '),PW/2,PM+164,{sz:32,al:'center'});
   T(x,fmtDate(date),PW/2,PM+(ch.length>1?214:164),{sz:28,c:'#555',al:'center'});
-  const gap=28,bw=(PW-2*PM-2*gap)/3,by=PM+(ch.length>1?260:220),bh=220;
+  const FL=fixLines();FL.forEach((ln,i)=>T(x,ln,PW/2,PM+(ch.length>1?256:206)+i*40,{sz:28,b:1,al:'center',max:PW-2*PM}));
+  const gap=28,bw=(PW-2*PM-2*gap)/3,by=PM+(ch.length>1?260:220)+FL.length*40,bh=220;
   [['العام',k.total,'total'],['الحالي',k.present,'present'],['المتفرقة',k.absent,'absent']].forEach(([t,v,key],i)=>{
     const X=PW-PM-(i+1)*bw-i*gap;RR(x,X,by,bw,bh,22,key==='absent'?'#e6e6e6':'#fff','#000',4);
     T(x,t,X+bw/2,by+48,{sz:36,b:1,al:'center'});T(x,v,X+bw/2,by+126,{sz:92,b:1,al:'center'});
@@ -1104,7 +1112,7 @@ function specRows(){const n=scopeN(),sel=specSel();const all=studentsIn(n);const
   REASONS.filter(r=>sel.includes(r.k)).forEach(r=>all.filter(x=>eff(x.l,x.s,curDate)===r.k).sort((a,b)=>{const A=info(a.l),B=info(b.l);return (A.co-B.co)||(A.pl-B.pl)||byReg(a.s,b.s)}).forEach(x=>out.push({...x,r})));return out}
 function specTitle(){const a=REASONS.filter(r=>specSel().includes(r.k)).map(r=>r.t);return a.length>3?'خاص':a.join(' و ')}
 function specText(){const n=scopeN(),rows=specRows(),sel=REASONS.filter(r=>specSel().includes(r.k));
-  let t=`*تقرير ${specTitle()}*\n${fullLabel(n)}\n${fmtDate(curDate)}\n\n`;
+  let t=`*تقرير ${specTitle()}*\n${fullLabel(n)}\n${fmtDate(curDate)}\n${fixTxt()}\n`;
   t+=sel.map(r=>`${r.t}: ${rows.filter(x=>x.r===r).length}`).join('\n')+`\nالمجموع: ${rows.length}\n`;
   sel.forEach(r=>{const l=rows.filter(x=>x.r===r);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((x,i)=>`${i+1}- ${tag(x)}`+(repNote(x.s,curDate)?`\n   ${repNote(x.s,curDate)}`:'')).join('\n')+'\n'});
   return t.trim()}
@@ -1124,7 +1132,7 @@ function episodes(){const n=scopeN(),sel=specSel(),[from,to]=specRange(),t=today
     e.info=[e.s.memo,e.cause?'السبب: '+e.cause:'',e.note].filter(Boolean).join(' — ')});
   return out.sort((a,b)=>REASONS.indexOf(RMAP[a.k])-REASONS.indexOf(RMAP[b.k])||(b.active-a.active)||a.since.localeCompare(b.since)||byReg(a.s,b.s))}
 function genText(){const n=scopeN(),E=episodes(),[from,to]=specRange(),sel=REASONS.filter(r=>specSel().includes(r.k));
-  let t=`*تقرير ${specTitle()} — المتفرقة العامة*\n${fullLabel(n)}\nمن ${dm(from)} إلى ${dm(to)}\n\n`;
+  let t=`*تقرير ${specTitle()} — المتفرقة العامة*\n${fullLabel(n)}\nمن ${dm(from)} إلى ${dm(to)}\n${fixTxt()}\n`;
   t+=sel.map(r=>{const l=E.filter(e=>e.k===r.k);return `${r.t}: ${l.length} (فعالة ${l.filter(e=>e.active).length} · منتهية ${l.filter(e=>!e.active).length})`}).join('\n')+`\nالمجموع: ${E.length}\n`;
   sel.forEach(r=>{const l=E.filter(e=>e.k===r.k);if(l.length)t+=`\n*${r.t}* (${l.length})\n`+l.map((e,i)=>`${i+1}- ${tag(e)}\n   من ${dm(e.since)} ${e.end||e.daily?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)} — ${e.stTxt}`+(e.info?`\n   ${e.info}`:'')).join('\n')+'\n'});
   return t.trim()}
@@ -1142,10 +1150,11 @@ function genPages(){
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
     T(x,`تقرير ${specTitle()} — المتفرقة العامة`+(part?' (تابع)':''),W/2,PM+28,{sz:42,b:1,al:'center',max:inner});
     T(x,`${fullLabel(n)} — من ${dm(from)} إلى ${dm(to)}`,W/2,PM+86,{sz:27,al:'center',max:inner});
-    T(x,sel.map(r=>`${r.t}: ${E.filter(e=>e.k===r.k).length}`).join('   ·   ')+`   ·   المجموع: ${E.length} (فعالة ${act} · منتهية ${E.length-act})`,W/2,PM+128,{sz:23,b:1,c:'#333',al:'center',max:inner});
+    const FL=fixLines(),fo=FL.length*34;FL.forEach((ln,i)=>T(x,ln,W/2,PM+122+i*34,{sz:25,b:1,al:'center',max:inner}));
+    T(x,sel.map(r=>`${r.t}: ${E.filter(e=>e.k===r.k).length}`).join('   ·   ')+`   ·   المجموع: ${E.length} (فعالة ${act} · منتهية ${E.length-act})`,W/2,PM+128+fo,{sz:23,b:1,c:'#333',al:'center',max:inner});
     // مفتاح الألوان
-    [['فعالة','#1f7a45'],['مستشفى لازال','#b3261e'],['منتهية','#8a8a8a']].forEach(([t,c],i)=>{const X=W-PM-i*230;x.fillStyle=c;x.fillRect(X-24,PM+152,20,20);T(x,t,X-34,PM+162,{sz:21,c})});
-    y=PM+190;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    [['فعالة','#1f7a45'],['مستشفى لازال','#b3261e'],['منتهية','#8a8a8a']].forEach(([t,c],i)=>{const X=W-PM-i*230;x.fillStyle=c;x.fillRect(X-24,PM+152+fo,20,20);T(x,t,X-34,PM+162+fo,{sz:21,c})});
+    y=PM+190+fo;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
     cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-10,y+RH/2,{sz:22,b:1,al:c.al?'center':'right'});cx-=c.w});
     x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
   top();
@@ -1179,8 +1188,9 @@ function specPages(){
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
     T(x,'تقرير '+specTitle()+(part?' (تابع)':''),W/2,PM+30,{sz:46,b:1,al:'center',max:inner});
     T(x,`${fullLabel(n)} — ${fmtDate(curDate)}`,W/2,PM+92,{sz:28,al:'center',max:inner});
-    T(x,sum,W/2,PM+140,{sz:26,b:1,c:'#333',al:'center',max:inner});
-    y=PM+180;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    const FL=fixLines(),fo=FL.length*36;FL.forEach((ln,i)=>T(x,ln,W/2,PM+132+i*36,{sz:26,b:1,al:'center',max:inner}));
+    T(x,sum,W/2,PM+140+fo,{sz:26,b:1,c:'#333',al:'center',max:inner});
+    y=PM+180+fo;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
     cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-12,y+RH/2,{sz:24,b:1,al:c.al?'center':'right'});cx-=c.w});
     x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
   top();
