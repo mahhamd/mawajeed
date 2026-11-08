@@ -1,5 +1,5 @@
 // غيّر رقم النسخة هنا مع كل تحديث (لازم يطابق APP_VERSION في index.html)
-const VERSION = '1.16.0';
+const VERSION = '1.16.1';
 const CACHE = 'mawajeed-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
@@ -13,6 +13,8 @@ self.addEventListener('message', e => { if (e.data === 'skip') self.skipWaiting(
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  // sw.js نفسه دايماً من الشبكة
+  if (new URL(req.url).pathname.endsWith('/sw.js')) return;
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => hit ||
       fetch(req).then(res => {

@@ -483,7 +483,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.16.0';
+const APP_VERSION='1.16.1';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -1530,7 +1530,7 @@ async function checkUpdate(){
   toast('جاري التحقق...');try{await SWR.update();setTimeout(()=>{if(SWR.waiting)showUpd(SWR.waiting);else if(!SWR.installing)toast('عندك آخر نسخة ✓')},1500)}catch(e){toast('تعذر التحقق')}
 }
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
-  navigator.serviceWorker.register('sw.js').then(reg=>{SWR=reg;
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{SWR=reg;
     if(reg.waiting&&navigator.serviceWorker.controller)showUpd(reg.waiting);
     reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpd(w)})});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&navigator.onLine)reg.update().catch(()=>{})});
