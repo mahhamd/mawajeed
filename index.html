@@ -359,7 +359,7 @@ nav button{font-size:11px}
       <label class="l">تاريخ الكشف</label><input id="detDate" type="date" onchange="detSet('date',this.value)">
       <div class="row">
         <div><label class="l" id="detDaysL">المدة الافتراضية (أيام)</label><input id="detDays" type="number" inputmode="numeric" min="0" onchange="detSet('days',Math.max(0,parseInt(digits(this.value))||0))"></div>
-        <div><label class="l" id="detTimeL">ساعة الخروج الافتراضية</label><input id="detTime" type="time" onchange="detSet('time',this.value)"></div>
+        <div id="detTimeW"><label class="l" id="detTimeL">ساعة الخروج الافتراضية</label><input id="detTime" type="time" onchange="detSet('time',this.value)"></div>
       </div>
       <p class="small">تنطبق على كل اسم تضيفه، وتقدر تغيّرها لكل طالب لحاله.</p>
     </div>
@@ -375,7 +375,7 @@ nav button{font-size:11px}
       <b>تصدير الكشف</b>
       <div class="seg wrap">
         <button id="dmS" onclick="setDetMode('s')">بدون أسباب<br><small>الأسماء فقط</small></button>
-        <button id="dmD" class="on" onclick="setDetMode('d')">مع الأسباب<br><small>والمدة والوقت</small></button>
+        <button id="dmD" class="on" onclick="setDetMode('d')">مع الأسباب<br><small>والأيام ووقت الخروج</small></button>
       </div>
       <button class="btn full" onclick="detPdfShare()">📄 إرسال PDF (واتساب)</button>
       <div class="row" style="margin-top:8px">
@@ -423,7 +423,7 @@ nav button{font-size:11px}
     <div id="dsOpts" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px"></div>
     <div class="row">
       <div><label class="l" id="dsDaysL">المدة (أيام)</label><input id="dsDays" type="number" inputmode="numeric" min="0"></div>
-      <div><label class="l" id="dsTimeL">ساعة الخروج</label><input id="dsTime" type="time"></div>
+      <div id="dsTimeW"><label class="l" id="dsTimeL">ساعة الخروج</label><input id="dsTime" type="time"></div>
     </div>
     <p class="small" id="dsExit" style="margin:8px 0 0"></p>
     <div class="row" style="margin-top:14px">
@@ -495,7 +495,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.18.0';
+const APP_VERSION='1.18.2';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -1445,7 +1445,7 @@ let curDet=null,detMode='d',dsIdx=null,dsReason='';
 const KT={det:{title:'كشف المحجوزين',file:'محجوزين',reasonL:'سبب الحجز',daysL:'المدة (أيام)',timeL:'ساعة الخروج',list:'المحجوزين',unit:'محجوز',col:'الخروج'},
   train:{title:'كشف التدريب الإضافي',file:'تدريب-إضافي',reasonL:'سبب التدريب الإضافي',daysL:'عدد الأيام',timeL:'وقت التدريب',list:'الأسماء',unit:'طالب',col:'الوقت'}};
 function KD(d){return KT[(d&&d.type)||'det']}
-function whenTxt(d,it){return (d.type==='train')?`${daysTxt(it.days)} — ${t12(it.time)}`:exitTxt(d,it)}
+function whenTxt(d,it){return d.type==='train'?daysTxt(it.days):exitTxt(d,it)}
 function DT(){return S.dets.find(d=>d.id===curDet)}
 function daysTxt(n){n=Number(n)||0;return n===0?'نفس اليوم':n===1?'يوم':n===2?'يومين':n<=10?`${n} أيام`:`${n} يوم`}
 function t12(t){if(!t)return '';const [h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'ص':'م'}`}
@@ -1470,14 +1470,14 @@ function renderDet(){
     return}
   home.style.display='none';ed.style.display='';const K=KD(d);
   document.getElementById('detTitle').textContent=K.title;document.getElementById('detListT').textContent=K.list;
-  document.getElementById('detDaysL').textContent=K.daysL.replace('(أيام)','الافتراضية (أيام)').replace('عدد الأيام','عدد الأيام الافتراضي');document.getElementById('detTimeL').textContent=K.timeL+' الافتراضي'+(d.type==='train'?'':'ة');
+  document.getElementById('detDaysL').textContent=K.daysL.replace('(أيام)','الافتراضية (أيام)').replace('عدد الأيام','عدد الأيام الافتراضي');document.getElementById('detTimeL').textContent=K.timeL+' الافتراضية';document.getElementById('detTimeW').style.display=d.type==='train'?'none':'';
   document.getElementById('detBatch').innerHTML=S.batches.map(b=>`<option value="${b.id}">${esc(label(b))}</option>`).join('');
   document.getElementById('detBatch').value=d.batchId;
   document.getElementById('detDate').value=d.date;document.getElementById('detDays').value=d.days;document.getElementById('detTime').value=d.time;
   document.getElementById('detCount').textContent=d.items.length+' طالب';
   const rows=detRows(d);
   document.getElementById('detList').innerHTML=rows.length?rows.map(r=>{const i=d.items.indexOf(r.it);
-    return `<li onclick="openDetItem(${i})"><span class="reg">${esc(r.s.reg)}</span><span class="nm">${esc(r.s.name)}<span class="unit">${r.l?esc(unitTxt(r.l)):''}${' · '+(d.type==='train'?esc(whenTxt(d,r.it)):daysTxt(r.it.days)+' · الخروج '+esc(exitTxt(d,r.it)))}</span></span>${r.it.reason?`<span class="chip dr">${esc(r.it.reason)}</span>`:'<span class="chip none">اختر السبب</span>'}</li>`}).join(''):'<div class="empty">ابحث بالأعلى وأضف الأسماء</div>';
+    return `<li onclick="openDetItem(${i})"><span class="reg">${esc(r.s.reg)}</span><span class="nm">${esc(r.s.name)}<span class="unit">${r.l?esc(unitTxt(r.l)):''}${' · '+daysTxt(r.it.days)+(d.type==='train'?'':' · الخروج '+esc(exitTxt(d,r.it)))}</span></span>${r.it.reason?`<span class="chip dr">${esc(r.it.reason)}</span>`:'<span class="chip none">اختر السبب</span>'}</li>`}).join(''):'<div class="empty">ابحث بالأعلى وأضف الأسماء</div>';
   renderDetSearch();
 }
 function renderDetSearch(){
@@ -1494,13 +1494,13 @@ function addDetItem(lid,reg){const d=DT(),l=N(lid),st=l.students.find(s=>s.reg==
   document.getElementById('detSearch').value='';renderDet();openDetItem(d.items.length-1)}
 function openDetItem(i){const d=DT(),it=d.items[i],r=detStudent(it),K=KD(d);dsIdx=i;dsReason=it.reason;
   document.getElementById('dsReasonL').textContent=K.reasonL;document.getElementById('dsDaysL').textContent=K.daysL;document.getElementById('dsTimeL').textContent=K.timeL;
-  document.getElementById('dsReasonIn').value=it.reason||'';
+  document.getElementById('dsReasonIn').value=it.reason||'';document.getElementById('dsTimeW').style.display=d.type==='train'?'none':'';
   document.getElementById('dsName').textContent=r.s.name;
   document.getElementById('dsReg').textContent=`رقم التسجيل: ${r.s.reg}`+(r.l?' — '+unitTxt(r.l):'');
   document.getElementById('dsDays').value=it.days;document.getElementById('dsTime').value=it.time;
   drawDsOpts();updDsExit();document.getElementById('detSheet').classList.add('on')}
 function drawDsOpts(){const d=DT();document.getElementById('dsOpts').innerHTML=(d&&d.type==='train')?'':'<span class="small" style="width:100%">اختيار سريع:</span>'+DREASONS.map(r=>`<button class="tb" onclick="document.getElementById('dsReasonIn').value='${r}'">${r}</button>`).join('')}
-function updDsExit(){const d=DT();if(!d)return;const it={days:document.getElementById('dsDays').value,time:document.getElementById('dsTime').value};document.getElementById('dsExit').textContent=(d.type==='train'?'التدريب: ':'الخروج: ')+whenTxt(d,it)}
+function updDsExit(){const d=DT();if(!d)return;const it={days:document.getElementById('dsDays').value,time:document.getElementById('dsTime').value};document.getElementById('dsExit').textContent=(d.type==='train'?'المدة: ':'الخروج: ')+whenTxt(d,it)}
 document.getElementById('dsDays').addEventListener('input',updDsExit);document.getElementById('dsTime').addEventListener('input',updDsExit);
 function closeDetSheet(){document.getElementById('detSheet').classList.remove('on')}
 function saveDetItem(){const d=DT(),it=d.items[dsIdx];
@@ -1512,15 +1512,15 @@ function detReady(){const d=DT();if(!d.items.length){toast('الكشف فاضي'
 function detText(){const d=DT(),b=N(d.batchId),rows=detRows(d);
   const K=KD(d);let t=`*${K.title} — ${label(b)}*\n${fmtDate(d.date)}\nالعدد: ${rows.length}\n\n`;
   t+=rows.map((r,i)=>{const x={s:r.s,l:r.l};let line=`${i+1}- `+(r.l?tag(x):`${r.s.reg} ${r.s.name}`);
-    if(detMode==='d')line+=`\n   ${r.it.reason?'السبب: '+r.it.reason+' — ':''}`+(d.type==='train'?`${daysTxt(r.it.days)} — الوقت: ${t12(r.it.time)}`:`المدة: ${daysTxt(r.it.days)} — الخروج: ${exitTxt(d,r.it)}`);return line}).join('\n');
+    if(detMode==='d')line+=`\n   ${r.it.reason?'السبب: '+r.it.reason+' — ':''}المدة: ${daysTxt(r.it.days)}`+(d.type==='train'?'':` — الخروج: ${exitTxt(d,r.it)}`);return line}).join('\n');
   return t.trim()}
 async function detTextShare(){if(!detReady())return;const t=detText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){toast('تعذر')}}}
 function detPages(){
   const d=DT(),b=N(d.batchId),rows=detRows(d),det=detMode==='d',land=det;
   const W=land?PH:PW,H=land?PW:PH,inner=W-2*PM,RH=58,hasCo=rows.some(r=>r.l&&info(r.l).co);
-  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),...(det?[{t:'السبب',w:330,al:1},{t:'المدة',w:110,al:1},{t:KD(d).col,w:d.type==='train'?150:300,al:1}]:[])];
+  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),...(det?[{t:'السبب',w:d.type==='train'?420:330,al:1},{t:'المدة',w:d.type==='train'?140:110,al:1},...(d.type==='train'?[]:[{t:'الخروج',w:300,al:1}])]:[])];
   const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
-  const data=rows.map((r,i)=>{const f=r.l?info(r.l):{abbr:b.abbr||'',co:'',pl:''};return [i+1,f.abbr,r.s.reg,r.s.name,...(hasCo?[f.co,f.pl]:[]),...(det?[r.it.reason||'—',daysTxt(r.it.days),d.type==='train'?t12(r.it.time):exitTxt(d,r.it)]:[])]});
+  const data=rows.map((r,i)=>{const f=r.l?info(r.l):{abbr:b.abbr||'',co:'',pl:''};return [i+1,f.abbr,r.s.reg,r.s.name,...(hasCo?[f.co,f.pl]:[]),...(det?[r.it.reason||'—',daysTxt(r.it.days),...(d.type==='train'?[]:[exitTxt(d,r.it)])]:[])]});
   const out=[];let p,x,y,part=0;
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
     T(x,KD(d).title+(part?' (تابع)':''),W/2,PM+30,{sz:52,b:1,al:'center'});
