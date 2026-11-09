@@ -403,6 +403,14 @@ nav button{font-size:11px}
   </div>
 </div>
 
+<div class="sheet-bg" id="histSheet" onclick="if(event.target===this)closeHist()">
+  <div class="sheet">
+    <h3 id="hName"></h3>
+    <div class="sub" id="hSub"></div>
+    <div id="hBody"></div>
+    <button class="btn sec full" style="margin-top:10px" onclick="closeHist()">إغلاق</button>
+  </div>
+</div>
 <div class="sheet-bg" id="detSheet" onclick="if(event.target===this)closeDetSheet()">
   <div class="sheet">
     <h3 id="dsName"></h3>
@@ -483,7 +491,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.16.1';
+const APP_VERSION='1.17.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -653,7 +661,7 @@ function renderStudents(){
   const q=norm(document.getElementById('search2').value);
   document.getElementById('stCount').textContent=l.students.length+' طالب';
   const arr=l.students.filter(s=>!q||norm(s.reg).includes(q)||norm(s.name).includes(q)).sort(byReg);
-  ul.innerHTML=arr.length?arr.map(s=>`<li style="cursor:default"><span class="reg">${esc(s.reg)}</span><span class="nm">${esc(s.name)}${s.memo?`<span class="unit">${esc(s.memo)}</span>`:''}</span><button class="del" onclick="delStudent('${esc(s.reg)}')">×</button></li>`).join(''):'<div class="empty">لا يوجد طلبة في هذه الوحدة</div>';
+  ul.innerHTML=arr.length?arr.map(s=>`<li style="cursor:default"><span class="reg">${esc(s.reg)}</span><span class="nm" style="cursor:pointer" onclick="openHist('${l.id}','${esc(s.reg)}')">${esc(s.name)}${s.memo?`<span class="unit">${esc(s.memo)}</span>`:''}</span><button class="del" onclick="delStudent('${esc(s.reg)}')">×</button></li>`).join(''):'<div class="empty">لا يوجد طلبة في هذه الوحدة</div>';
 }
 function renderSettings(){
   const row=(n,d)=>{const cnt=studentsIn(n).length,canSplit=!n.students.length&&d<3;
@@ -709,6 +717,7 @@ function drawSheet(){
       <button class="btn full" style="margin-top:10px" onclick="applyFx()">حفظ</button></div>`}
   h+=`<b style="font-size:14px">لليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
     (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء متفرقة اليوم)</button>`:'');
+  {const n=stEpisodes(l,s).length;h+=`<button class="btn sec full" style="margin-bottom:10px" onclick="openHist('${l.id}','${esc(s.reg)}')">📜 سجل المتفرقة (${n})</button>`}
   h+=`<label class="l">ملاحظة دائمة عند اسمه (مثل: موسيقى، يعمل شركة)</label><div class="row"><input id="shMemo" type="text" value="${esc(s.memo||'')}" placeholder="بدون"><button class="btn sec" style="flex:0 0 auto" onclick="saveMemo()">حفظ</button></div><div style="height:10px"></div>`;
   document.getElementById('shOpts').innerHTML=h;
   if(sel){document.getElementById('shSince').addEventListener('input',shPrev);shPrev()}
@@ -1208,6 +1217,79 @@ async function specPdfFile(){if(document.fonts&&document.fonts.ready)await docum
   return new File([makePDF(gen?genPages():specPages())],nm,{type:'application/pdf'})}
 async function specPdfShare(){if(!specReady())return;try{const f=await specPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function specPdfSave(){if(!specReady())return;try{dl(await specPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
+
+/* ---------- سجل المتفرقة لكل طالب ---------- */
+let hL=null,hR=null,hAdd=false;
+// كل فترات المتفرقة للطالب: الحالات (fx) + متفرقة الأيام المفردة
+function timesTxt(n){return n===1?'مرة':n===2?'مرتين':n<=10?`${n} مرات`:`${n} مرة`}
+function stEpisodes(l,s){const t=today(),out=[];
+  (s.fx||[]).forEach((e,i)=>out.push({src:'fx',i,e,k:e.k,since:e.since,end:e.end||null,due:e.due||null,cause:e.cause||'',note:e.note||''}));
+  Object.entries(l.days).forEach(([d,x])=>{const k=x.abs&&x.abs[s.reg];if(k&&RMAP[k])out.push({src:'day',d,k,since:d,end:addDays(d,1),cause:'',note:''})});
+  out.forEach(e=>{e.active=!e.end||e.end>t;e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1));
+    e.endTxt=e.end?dm(e.last):(e.due?`مستمرة (العودة المتوقعة ${dm(e.due)})`:'مستمرة');
+    e.info=[e.cause?(e.k==='death'?'':'السبب: ')+e.cause:'',e.note].filter(Boolean).join(' — ')});
+  return out.sort((a,b)=>b.since.localeCompare(a.since))}
+function openHist(lid,reg){hL=lid;hR=reg;hAdd=false;closeSheet();document.getElementById('histSheet').classList.add('on');drawHist()}
+function closeHist(){document.getElementById('histSheet').classList.remove('on')}
+function hS(){const l=N(hL);return {l,s:l.students.find(x=>x.reg===hR)}}
+function drawHist(){const {l,s}=hS(),E=stEpisodes(l,s);
+  document.getElementById('hName').textContent='📜 سجل المتفرقة — '+s.name;
+  document.getElementById('hSub').textContent=`${s.reg} — ${unitTxt(l)}${s.memo?' — '+s.memo:''}`;
+  const sum={};E.forEach(e=>{sum[e.k]=sum[e.k]||{n:0,d:0};sum[e.k].n++;sum[e.k].d+=e.dur});
+  let h=E.length?`<div class="card" style="margin:0 0 10px;background:#fafaf8;padding:10px 12px"><b>المجموع: ${timesTxt(E.length)}</b><div class="small" style="line-height:1.8">${Object.entries(sum).map(([k,v])=>`${RMAP[k].t}: ${timesTxt(v.n)} (${daysTxt(v.d)})`).join(' · ')}</div></div>`:'<div class="empty">ما عليه أي متفرقة مسجلة</div>';
+  h+=E.map((e,i)=>`<div class="ep ${e.active?(e.k==='hosp'?'hos':'act'):''}" style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1"><b>${RMAP[e.k].t}</b> — ${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}<br>من ${dm(e.since)} ${e.end?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)}${e.info?`<br><span style="font-size:13px">${esc(e.info)}</span>`:''}</div><button class="del" onclick="delEp(${i})" aria-label="حذف">×</button></div>`).join('');
+  if(hAdd){const o=REASONS.map(r=>`<option value="${r.k}">${r.t}</option>`).join('');
+    h+=`<div class="card" style="margin:10px 0 0;padding:10px 12px"><b>إضافة متفرقة سابقة</b>
+      <label class="l">النوع</label><select id="hk">${o}</select>
+      <div class="row"><div><label class="l">من</label><input id="hf" type="date" value="${addDays(curDate,-3)}"></div><div><label class="l">إلى (آخر يوم)</label><input id="ht" type="date" value="${addDays(curDate,-1)}"></div></div>
+      <label class="chk"><input id="hon" type="checkbox" onchange="document.getElementById('ht').disabled=this.checked"> لازالت مستمرة (بدون تاريخ نهاية)</label>
+      <label class="l">السبب</label><input id="hc" type="text" placeholder="مثال: عملية زائدة">
+      <label class="l">ملاحظة</label><input id="hn" type="text" placeholder="اختياري">
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="saveEp()">حفظ</button><button class="btn sec" onclick="hAdd=false;drawHist()">إلغاء</button></div></div>`}
+  else h+=`<button class="btn full" style="margin-top:10px" onclick="hAdd=true;drawHist();setTimeout(()=>document.getElementById('hk').scrollIntoView({block:'center'}),50)">＋ إضافة متفرقة سابقة</button>`;
+  if(E.length)h+=`<div class="row" style="margin-top:8px"><button class="btn sec" onclick="histPdf()">📄 PDF</button><button class="btn sec" onclick="histShare()">إرسال كنص</button></div>`;
+  document.getElementById('hBody').innerHTML=h}
+function saveEp(){const {l,s}=hS(),k=document.getElementById('hk').value,r=RMAP[k],from=document.getElementById('hf').value,on=document.getElementById('hon').checked,to=document.getElementById('ht').value;
+  if(!from)return toast('حدد تاريخ البداية');if(!on&&(!to||to<from))return toast('تاريخ النهاية لازم بعد البداية');
+  const end=on?null:addDays(to,1),cause=document.getElementById('hc').value.trim(),note=document.getElementById('hn').value.trim();
+  // منع التداخل مع فترة مسجلة
+  const clash=stEpisodes(l,s).find(e=>e.since<(end||'9999')&&(e.end||'9999')>from);
+  if(clash)return showMsg('فيه تداخل',`الفترة تتداخل مع «${RMAP[clash.k].t}» من ${dm(clash.since)} ${clash.end?'إلى '+dm(clash.last):'(مستمرة)'}.\nعدّل التواريخ أو احذف الفترة القديمة أول.`);
+  const snap=absSnap(l,s);
+  if(!r.fx){let d=from;const last=on?curDate:to;while(d<=last){if(!l.days[d])l.days[d]={present:null,abs:{}};l.days[d].abs[s.reg]=k;d=addDays(d,1)}}
+  else{s.fx=s.fx||[];s.fx.push({k,since:from,end,note,cause,days:end?diffDays(from,end):null,due:null})}
+  fixPresent(l,s,snap);save();hAdd=false;renderAll();drawHist();toast('تمت الإضافة للسجل ✓')}
+function delEp(i){const {l,s}=hS(),e=stEpisodes(l,s)[i];
+  ask(`حذف «${RMAP[e.k].t}» من ${dm(e.since)} من السجل؟`,()=>{const snap=absSnap(l,s);
+    if(e.src==='fx')s.fx.splice(s.fx.indexOf(e.e),1);else delete l.days[e.d].abs[s.reg];
+    fixPresent(l,s,snap);save();renderAll();document.getElementById('histSheet').classList.add('on');drawHist()})}
+function histText(){const {l,s}=hS(),E=stEpisodes(l,s);
+  const ut=unitTxt(l)!==info(l).abbr?'\n'+unitTxt(l):'';let t=`*سجل المتفرقة*\n${tag({l,s})}${ut}${s.memo?'\n'+s.memo:''}\n\nالمجموع: ${timesTxt(E.length)}\n\n`;
+  t+=E.map((e,i)=>`${i+1}- ${RMAP[e.k].t} — من ${dm(e.since)} ${e.end?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)} — ${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}`+(e.info?`\n   ${e.info}`:'')).join('\n');return t}
+async function histShare(){const t=histText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){}}}
+function histPages(){const {l,s}=hS(),E=stEpisodes(l,s),W=PW,H=PH,inner=W-2*PM,RH=56,f=info(l);
+  const cols=[{t:'م',w:56,al:1},{t:'نوع المتفرقة',w:210,al:1},{t:'من',w:160,al:1},{t:'إلى',w:160,al:1},{t:'المدة',w:110,al:1},{t:'الحالة',w:110,al:1},{t:'السبب / ملاحظة',w:0}];
+  const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
+  const out=[];let p,x,y,part=0;
+  const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
+    T(x,'سجل المتفرقة'+(part?' (تابع)':''),W/2,PM+30,{sz:48,b:1,al:'center'});
+    T(x,`${s.name}`,W/2,PM+96,{sz:36,b:1,al:'center',max:inner});
+    T(x,[f.abbr,s.reg,f.co?'السرية '+f.co:'',f.pl?'الفصيل '+f.pl:''].filter(Boolean).join('   ·   '),W/2,PM+146,{sz:26,c:'#333',al:'center',max:inner});
+    T(x,`المجموع: ${timesTxt(E.length)}${s.memo?'   ·   '+s.memo:''}   ·   ${fmtDate(today())}`,W/2,PM+190,{sz:24,c:'#555',al:'center',max:inner});
+    y=PM+230;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
+    cols.forEach(c=>{T(x,c.t,c.al?cx-c.w/2:cx-10,y+RH/2,{sz:23,b:1,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#000';x.lineWidth=2;x.strokeRect(PM,y,inner,RH);y+=RH;part++};
+  top();
+  E.forEach((e,i)=>{if(y+RH>H-PM-60)top();if(e.active){x.fillStyle='#e8e8e8';x.fillRect(PM,y,inner,RH)}
+    const r=[i+1,RMAP[e.k].t,dm(e.since),e.end?dm(e.last):'مستمرة',daysTxt(e.dur),e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية',e.info];
+    let cx=W-PM;r.forEach((v,j)=>{const c=cols[j];T(x,v,c.al?cx-c.w/2:cx-10,y+RH/2,{sz:j===6?20:23,b:j===5&&e.active,max:c.w-16,al:c.al?'center':'right'});cx-=c.w});
+    x.strokeStyle='#bbb';x.lineWidth=1;x.beginPath();x.moveTo(PM,y+RH);x.lineTo(W-PM,y+RH);x.stroke();y+=RH});
+  if(y+150>H-PM)top();
+  T(x,'المسؤول: ......................................',W-PM,H-PM-80,{sz:29});T(x,'التوقيع: ......................',PM,H-PM-80,{sz:29,al:'left'});
+  out.forEach((pg,i)=>T(pg.x,`${i+1} / ${out.length}`,W/2,H-PM/2,{sz:22,c:'#777',al:'center'}));return out}
+async function histPdf(){try{if(document.fonts&&document.fonts.ready)await document.fonts.ready;const {s}=hS();
+  const fl=new File([makePDF(histPages())],`سجل-متفرقة-${s.reg}-${s.name.split(' ')[0]}.pdf`.replace(/[\\/:*?"<>|]/g,'-'),{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[fl]}))await navigator.share({files:[fl],title:fl.name});else dl(fl)}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 
 /* ---------- زر المتفرقة السريع ---------- */
 function openFab(){document.getElementById('fabSearch').value='';document.getElementById('fabSheet').classList.add('on');renderFab()}
