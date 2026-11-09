@@ -346,17 +346,20 @@ nav button{font-size:11px}
 <!-- ======= المحجوزين ======= -->
 <section class="view" id="v-det">
   <div id="detHome">
-    <button class="btn full" onclick="newDet()">➕ إنشاء كشف محجوزين</button>
+    <div class="row">
+      <button class="btn" style="padding:18px 8px;flex-direction:column;gap:4px" onclick="newDet('det')"><span style="font-size:24px">🔒</span>كشف محجوزين</button>
+      <button class="btn" style="padding:18px 8px;flex-direction:column;gap:4px;background:#3d4f5c" onclick="newDet('train')"><span style="font-size:24px">🏃</span>كشف تدريب إضافي</button>
+    </div>
     <div class="card" style="margin-top:12px"><b>الكشوف السابقة</b><ul class="list" id="detHist"></ul></div>
   </div>
   <div id="detEd" style="display:none">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center"><b>كشف المحجوزين</b><button class="tb" onclick="closeDet()">↩ كل الكشوف</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><b id="detTitle">كشف المحجوزين</b><button class="tb" onclick="closeDet()">↩ كل الكشوف</button></div>
       <label class="l">الدورة</label><select id="detBatch" onchange="detSetBatch(this.value)"></select>
       <label class="l">تاريخ الكشف</label><input id="detDate" type="date" onchange="detSet('date',this.value)">
       <div class="row">
-        <div><label class="l">المدة الافتراضية (أيام)</label><input id="detDays" type="number" inputmode="numeric" min="0" onchange="detSet('days',Math.max(0,parseInt(digits(this.value))||0))"></div>
-        <div><label class="l">ساعة الخروج الافتراضية</label><input id="detTime" type="time" onchange="detSet('time',this.value)"></div>
+        <div><label class="l" id="detDaysL">المدة الافتراضية (أيام)</label><input id="detDays" type="number" inputmode="numeric" min="0" onchange="detSet('days',Math.max(0,parseInt(digits(this.value))||0))"></div>
+        <div><label class="l" id="detTimeL">ساعة الخروج الافتراضية</label><input id="detTime" type="time" onchange="detSet('time',this.value)"></div>
       </div>
       <p class="small">تنطبق على كل اسم تضيفه، وتقدر تغيّرها لكل طالب لحاله.</p>
     </div>
@@ -365,14 +368,14 @@ nav button{font-size:11px}
       <ul class="list" id="detRes"></ul>
     </div>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center"><b>المحجوزين</b><span class="small" id="detCount"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><b id="detListT">المحجوزين</b><span class="small" id="detCount"></span></div>
       <ul class="list" id="detList"></ul>
     </div>
     <div class="card">
       <b>تصدير الكشف</b>
       <div class="seg wrap">
-        <button id="dmS" onclick="setDetMode('s')">بدون السبب<br>ووقت الخروج</button>
-        <button id="dmD" class="on" onclick="setDetMode('d')">مع التفاصيل<br>(السبب والخروج)</button>
+        <button id="dmS" onclick="setDetMode('s')">بدون أسباب<br><small>الأسماء فقط</small></button>
+        <button id="dmD" class="on" onclick="setDetMode('d')">مع الأسباب<br><small>والمدة والوقت</small></button>
       </div>
       <button class="btn full" onclick="detPdfShare()">📄 إرسال PDF (واتساب)</button>
       <div class="row" style="margin-top:8px">
@@ -389,7 +392,7 @@ nav button{font-size:11px}
   <button class="on" data-v="today" onclick="go('today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>الموجود</button>
   <button data-v="kashf" onclick="go('kashf')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8.5 10l1.5 1.5 3-3M8.5 16l1.5 1.5 3-3M15 11h1M15 17h1"/></svg>الكشوف</button>
   <button data-v="report" onclick="go('report')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>التقرير</button>
-  <button data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>المحجوزين</button>
+  <button data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>إنشاء كشف</button>
   <button data-v="students" onclick="go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5.5"/></svg>الطلبة</button>
   <button data-v="settings" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>الإعدادات</button>
 </nav>
@@ -415,11 +418,12 @@ nav button{font-size:11px}
   <div class="sheet">
     <h3 id="dsName"></h3>
     <div class="sub" id="dsReg"></div>
-    <b style="font-size:14px">سبب الحجز</b>
-    <div class="dgrid" id="dsOpts" style="margin:8px 0 12px"></div>
+    <label class="l" style="margin-top:0" id="dsReasonL">سبب الحجز</label>
+    <textarea id="dsReasonIn" rows="2" placeholder="اكتب السبب هنا"></textarea>
+    <div id="dsOpts" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px"></div>
     <div class="row">
-      <div><label class="l">المدة (أيام)</label><input id="dsDays" type="number" inputmode="numeric" min="0"></div>
-      <div><label class="l">ساعة الخروج</label><input id="dsTime" type="time"></div>
+      <div><label class="l" id="dsDaysL">المدة (أيام)</label><input id="dsDays" type="number" inputmode="numeric" min="0"></div>
+      <div><label class="l" id="dsTimeL">ساعة الخروج</label><input id="dsTime" type="time"></div>
     </div>
     <p class="small" id="dsExit" style="margin:8px 0 0"></p>
     <div class="row" style="margin-top:14px">
@@ -491,7 +495,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.17.0';
+const APP_VERSION='1.18.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -1437,6 +1441,11 @@ function impRender(){
 /* ---------- كشف المحجوزين ---------- */
 const DREASONS=['ممنوعات','تأخير عودة','غياب','عيادة','تقرير','الضبط والربط','التحاق جديد','إنذار'];
 let curDet=null,detMode='d',dsIdx=null,dsReason='';
+// نوعين: كشف محجوزين / كشف تدريب إضافي
+const KT={det:{title:'كشف المحجوزين',file:'محجوزين',reasonL:'سبب الحجز',daysL:'المدة (أيام)',timeL:'ساعة الخروج',list:'المحجوزين',unit:'محجوز',col:'الخروج'},
+  train:{title:'كشف التدريب الإضافي',file:'تدريب-إضافي',reasonL:'سبب التدريب الإضافي',daysL:'عدد الأيام',timeL:'وقت التدريب',list:'الأسماء',unit:'طالب',col:'الوقت'}};
+function KD(d){return KT[(d&&d.type)||'det']}
+function whenTxt(d,it){return (d.type==='train')?`${daysTxt(it.days)} — ${t12(it.time)}`:exitTxt(d,it)}
 function DT(){return S.dets.find(d=>d.id===curDet)}
 function daysTxt(n){n=Number(n)||0;return n===0?'نفس اليوم':n===1?'يوم':n===2?'يومين':n<=10?`${n} أيام`:`${n} يوم`}
 function t12(t){if(!t)return '';const [h,m]=t.split(':').map(Number);return `${(h%12)||12}:${String(m).padStart(2,'0')} ${h<12?'ص':'م'}`}
@@ -1446,7 +1455,7 @@ function exitTxt(det,it){const d=new Date(det.date+'T12:00');d.setDate(d.getDate
 function detStudent(it){const l=IDX[it.leafId]&&N(it.leafId);const st=l&&l.students.find(s=>s.reg===it.reg);return {l:l||null,s:st||{reg:it.reg,name:it.name}}}
 function detRows(det){return det.items.map(it=>({it,...detStudent(it)})).sort((a,b)=>{const A=a.l?info(a.l):{co:0,pl:0},B=b.l?info(b.l):{co:0,pl:0};return (A.co-B.co)||(A.pl-B.pl)||byReg(a.s,b.s)})}
 function defaultBatch(){const n=scopeN();if(n===ROOT)return (S.batches[0]||{}).id;if(n.virtual){const l=leaves(n)[0];return l?chain(l)[0].id:(S.batches[0]||{}).id}return chain(n)[0].id}
-function newDet(){const b=defaultBatch();if(!b)return toast('أضف دفعة من الإعدادات');const d={id:uid(),batchId:b,date:curDate,days:1,time:'16:00',items:[]};S.dets.push(d);save();curDet=d.id;renderDet();window.scrollTo(0,0)}
+function newDet(type){const b=defaultBatch();if(!b)return toast('أضف دفعة من الإعدادات');const d={id:uid(),type:type||'det',batchId:b,date:curDate,days:1,time:type==='train'?'17:00':'16:00',items:[]};S.dets.push(d);save();curDet=d.id;renderDet();window.scrollTo(0,0)}
 function openDet(id){curDet=id;renderDet();window.scrollTo(0,0)}
 function closeDet(){curDet=null;renderDet()}
 function detSet(k,v){const d=DT();d[k]=v;save();renderDet()}
@@ -1457,16 +1466,18 @@ function renderDet(){
   const home=document.getElementById('detHome'),ed=document.getElementById('detEd'),d=DT();
   if(!d){curDet=null;home.style.display='';ed.style.display='none';
     const arr=[...S.dets].sort((a,b)=>b.date.localeCompare(a.date));
-    document.getElementById('detHist').innerHTML=arr.length?arr.map(x=>{const b=IDX[x.batchId]?label(N(x.batchId)):'—';return `<li onclick="openDet('${x.id}')"><span class="nm">${esc(b)}<span class="unit">${fmtDate(x.date)}</span></span><span class="badge ok">${x.items.length} محجوز</span></li>`}).join(''):'<div class="empty">لا توجد كشوف</div>';
+    document.getElementById('detHist').innerHTML=arr.length?arr.map(x=>{const b=IDX[x.batchId]?label(N(x.batchId)):'—';return `<li onclick="openDet('${x.id}')"><span class="nm"><b>${KD(x).title}</b><span class="unit">${esc(b)} · ${fmtDate(x.date)}</span></span><span class="badge ok">${x.items.length} ${KD(x).unit}</span></li>`}).join(''):'<div class="empty">لا توجد كشوف</div>';
     return}
-  home.style.display='none';ed.style.display='';
+  home.style.display='none';ed.style.display='';const K=KD(d);
+  document.getElementById('detTitle').textContent=K.title;document.getElementById('detListT').textContent=K.list;
+  document.getElementById('detDaysL').textContent=K.daysL.replace('(أيام)','الافتراضية (أيام)').replace('عدد الأيام','عدد الأيام الافتراضي');document.getElementById('detTimeL').textContent=K.timeL+' الافتراضي'+(d.type==='train'?'':'ة');
   document.getElementById('detBatch').innerHTML=S.batches.map(b=>`<option value="${b.id}">${esc(label(b))}</option>`).join('');
   document.getElementById('detBatch').value=d.batchId;
   document.getElementById('detDate').value=d.date;document.getElementById('detDays').value=d.days;document.getElementById('detTime').value=d.time;
   document.getElementById('detCount').textContent=d.items.length+' طالب';
   const rows=detRows(d);
   document.getElementById('detList').innerHTML=rows.length?rows.map(r=>{const i=d.items.indexOf(r.it);
-    return `<li onclick="openDetItem(${i})"><span class="reg">${esc(r.s.reg)}</span><span class="nm">${esc(r.s.name)}<span class="unit">${r.l?esc(unitTxt(r.l)):''}${r.it.reason?' · '+daysTxt(r.it.days)+' · الخروج '+esc(exitTxt(d,r.it)):''}</span></span>${r.it.reason?`<span class="chip dr">${esc(r.it.reason)}</span>`:'<span class="chip none">اختر السبب</span>'}</li>`}).join(''):'<div class="empty">ابحث بالأعلى وأضف الأسماء</div>';
+    return `<li onclick="openDetItem(${i})"><span class="reg">${esc(r.s.reg)}</span><span class="nm">${esc(r.s.name)}<span class="unit">${r.l?esc(unitTxt(r.l)):''}${' · '+(d.type==='train'?esc(whenTxt(d,r.it)):daysTxt(r.it.days)+' · الخروج '+esc(exitTxt(d,r.it)))}</span></span>${r.it.reason?`<span class="chip dr">${esc(r.it.reason)}</span>`:'<span class="chip none">اختر السبب</span>'}</li>`}).join(''):'<div class="empty">ابحث بالأعلى وأضف الأسماء</div>';
   renderDetSearch();
 }
 function renderDetSearch(){
@@ -1481,36 +1492,38 @@ function renderDetSearch(){
 function addDetItem(lid,reg){const d=DT(),l=N(lid),st=l.students.find(s=>s.reg===reg);
   d.items.push({leafId:lid,reg,name:st.name,reason:'',days:d.days,time:d.time});save();
   document.getElementById('detSearch').value='';renderDet();openDetItem(d.items.length-1)}
-function openDetItem(i){const d=DT(),it=d.items[i],r=detStudent(it);dsIdx=i;dsReason=it.reason;
+function openDetItem(i){const d=DT(),it=d.items[i],r=detStudent(it),K=KD(d);dsIdx=i;dsReason=it.reason;
+  document.getElementById('dsReasonL').textContent=K.reasonL;document.getElementById('dsDaysL').textContent=K.daysL;document.getElementById('dsTimeL').textContent=K.timeL;
+  document.getElementById('dsReasonIn').value=it.reason||'';
   document.getElementById('dsName').textContent=r.s.name;
   document.getElementById('dsReg').textContent=`رقم التسجيل: ${r.s.reg}`+(r.l?' — '+unitTxt(r.l):'');
   document.getElementById('dsDays').value=it.days;document.getElementById('dsTime').value=it.time;
   drawDsOpts();updDsExit();document.getElementById('detSheet').classList.add('on')}
-function drawDsOpts(){document.getElementById('dsOpts').innerHTML=DREASONS.map(r=>`<button class="opt ${dsReason===r?'on':''}" onclick="dsReason='${r}';drawDsOpts()">${r}</button>`).join('')}
-function updDsExit(){const d=DT();if(!d)return;const it={days:document.getElementById('dsDays').value,time:document.getElementById('dsTime').value};document.getElementById('dsExit').textContent='الخروج: '+exitTxt(d,it)}
+function drawDsOpts(){const d=DT();document.getElementById('dsOpts').innerHTML=(d&&d.type==='train')?'':'<span class="small" style="width:100%">اختيار سريع:</span>'+DREASONS.map(r=>`<button class="tb" onclick="document.getElementById('dsReasonIn').value='${r}'">${r}</button>`).join('')}
+function updDsExit(){const d=DT();if(!d)return;const it={days:document.getElementById('dsDays').value,time:document.getElementById('dsTime').value};document.getElementById('dsExit').textContent=(d.type==='train'?'التدريب: ':'الخروج: ')+whenTxt(d,it)}
 document.getElementById('dsDays').addEventListener('input',updDsExit);document.getElementById('dsTime').addEventListener('input',updDsExit);
 function closeDetSheet(){document.getElementById('detSheet').classList.remove('on')}
-function saveDetItem(){const d=DT(),it=d.items[dsIdx];if(!dsReason)return toast('اختر سبب الحجز');
-  it.reason=dsReason;it.days=Math.max(0,parseInt(digits(document.getElementById('dsDays').value))||0);it.time=document.getElementById('dsTime').value||d.time;
+function saveDetItem(){const d=DT(),it=d.items[dsIdx];
+  it.reason=document.getElementById('dsReasonIn').value.trim();it.days=Math.max(0,parseInt(digits(document.getElementById('dsDays').value))||0);it.time=document.getElementById('dsTime').value||d.time;
   save();closeDetSheet();renderDet();toast('تم الحفظ')}
 function removeDetItem(){const d=DT();d.items.splice(dsIdx,1);save();closeDetSheet();renderDet()}
 function detReady(){const d=DT();if(!d.items.length){toast('الكشف فاضي');return null}
-  if(detMode==='d'&&d.items.some(i=>!i.reason)){toast('فيه أسماء بدون سبب حجز');return null}return d}
+  return d}
 function detText(){const d=DT(),b=N(d.batchId),rows=detRows(d);
-  let t=`*كشف المحجوزين — ${label(b)}*\n${fmtDate(d.date)}\nالعدد: ${rows.length}\n\n`;
+  const K=KD(d);let t=`*${K.title} — ${label(b)}*\n${fmtDate(d.date)}\nالعدد: ${rows.length}\n\n`;
   t+=rows.map((r,i)=>{const x={s:r.s,l:r.l};let line=`${i+1}- `+(r.l?tag(x):`${r.s.reg} ${r.s.name}`);
-    if(detMode==='d')line+=`\n   السبب: ${r.it.reason} — المدة: ${daysTxt(r.it.days)} — الخروج: ${exitTxt(d,r.it)}`;return line}).join('\n');
+    if(detMode==='d')line+=`\n   ${r.it.reason?'السبب: '+r.it.reason+' — ':''}`+(d.type==='train'?`${daysTxt(r.it.days)} — الوقت: ${t12(r.it.time)}`:`المدة: ${daysTxt(r.it.days)} — الخروج: ${exitTxt(d,r.it)}`);return line}).join('\n');
   return t.trim()}
 async function detTextShare(){if(!detReady())return;const t=detText();if(navigator.share){try{await navigator.share({text:t})}catch(e){}}else{try{await navigator.clipboard.writeText(t);toast('تم النسخ ✓')}catch(e){toast('تعذر')}}}
 function detPages(){
   const d=DT(),b=N(d.batchId),rows=detRows(d),det=detMode==='d',land=det;
   const W=land?PH:PW,H=land?PW:PH,inner=W-2*PM,RH=58,hasCo=rows.some(r=>r.l&&info(r.l).co);
-  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),...(det?[{t:'سبب الحجز',w:220,al:1},{t:'المدة',w:110,al:1},{t:'الخروج',w:300,al:1}]:[])];
+  const cols=[{t:'م',w:56,al:1},{t:'دورة',w:130,al:1},{t:'رقم التسجيل',w:150,al:1},{t:'الاسم',w:0},...(hasCo?[{t:'السرية',w:78,al:1},{t:'الفصيل',w:78,al:1}]:[]),...(det?[{t:'السبب',w:330,al:1},{t:'المدة',w:110,al:1},{t:KD(d).col,w:d.type==='train'?150:300,al:1}]:[])];
   const fixed=cols.reduce((a,c)=>a+(c.w||0),0);cols.forEach(c=>{if(!c.w)c.w=inner-fixed});
-  const data=rows.map((r,i)=>{const f=r.l?info(r.l):{abbr:b.abbr||'',co:'',pl:''};return [i+1,f.abbr,r.s.reg,r.s.name,...(hasCo?[f.co,f.pl]:[]),...(det?[r.it.reason,daysTxt(r.it.days),exitTxt(d,r.it)]:[])]});
+  const data=rows.map((r,i)=>{const f=r.l?info(r.l):{abbr:b.abbr||'',co:'',pl:''};return [i+1,f.abbr,r.s.reg,r.s.name,...(hasCo?[f.co,f.pl]:[]),...(det?[r.it.reason||'—',daysTxt(r.it.days),d.type==='train'?t12(r.it.time):exitTxt(d,r.it)]:[])]});
   const out=[];let p,x,y,part=0;
   const top=()=>{p=pgNew(W,H);out.push(p);x=p.x;
-    T(x,'كشف المحجوزين'+(part?' (تابع)':''),W/2,PM+30,{sz:52,b:1,al:'center'});
+    T(x,KD(d).title+(part?' (تابع)':''),W/2,PM+30,{sz:52,b:1,al:'center'});
     T(x,label(b),W/2,PM+100,{sz:34,b:1,al:'center'});
     T(x,`${fmtDate(d.date)}   ·   العدد: ${rows.length}`,W/2,PM+152,{sz:28,c:'#444',al:'center'});
     y=PM+200;let cx=W-PM;x.fillStyle='#dcdcdc';x.fillRect(PM,y,inner,RH);
@@ -1528,7 +1541,7 @@ function detPages(){
   return out;
 }
 async function detPdfFile(){if(document.fonts&&document.fonts.ready)await document.fonts.ready;const d=DT(),b=N(d.batchId);
-  const nm=`محجوزين-${shortName(b)}-${d.date}${detMode==='s'?'-مختصر':''}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
+  const nm=`${KD(d).file}-${shortName(b)}-${d.date}${detMode==='s'?'-بدون-أسباب':''}.pdf`.replace(/[\\/:*?"<>|]/g,'-');
   return new File([makePDF(detPages())],nm,{type:'application/pdf'})}
 async function detPdfShare(){if(!detReady())return;try{const f=await detPdfFile();if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:f.name});else{dl(f);toast('تم حفظ الملف')}}catch(e){if(e&&e.name!=='AbortError')toast('تعذر إنشاء الملف')}}
 async function detPdfSave(){if(!detReady())return;try{dl(await detPdfFile())}catch(e){toast('تعذر إنشاء الملف')}}
