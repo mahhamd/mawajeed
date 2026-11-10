@@ -133,9 +133,49 @@ nav button{font-size:11px}
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:4px 0 8px}
 .legend span::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-left:4px;vertical-align:middle;background:var(--c)}
 .more{text-align:center;font-size:13px;color:var(--muted);padding:10px}
+
+#login{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow:auto}
+#login.on{display:flex}
+#login .lg{width:100%;max-width:340px;text-align:center}
+#login input{margin-top:10px;text-align:center;font-size:17px}
+.linkb{background:none;border:none;color:var(--pri);margin-top:18px;font-size:14px;text-decoration:underline;cursor:pointer;font-family:inherit}
+.apb{font-size:12px;padding:4px 9px;border-radius:10px;white-space:nowrap;font-weight:600}
+.apb.none{background:#eee;color:#555}.apb.draft{background:#fff4e0;color:#7a5410}.apb.rej{background:#fdecea;color:#8e1f18}.apb.sub{background:#e7effa;color:#1d4f91}.apb.ok{background:var(--pri2);color:var(--pri)}
+body:not([data-role=admin]) .adm{display:none!important}
+body[data-role=view] .ed{display:none!important}
+body:not([data-role=admin]):not([data-role=ba]):not([data-role=gr]) .dt{display:none!important}
+body:not([data-role=admin]) #allList .del{display:none}
+body[data-role=view] #dueBar,body[data-role=view] #errBar{display:none!important}
+.btn:disabled,.stat input:disabled{opacity:.5}
+details summary{cursor:pointer}
 </style>
 </head>
 <body>
+<div id="login" class="on">
+ <div class="lg">
+  <img src="icon-180.png" alt="" style="width:76px;height:76px;border-radius:18px">
+  <h1 style="margin:8px 0 4px">المواجيد</h1>
+  <div id="lgMain">
+   <p class="small">سجّل دخول باسمك والرقم السري</p>
+   <input id="lgName" type="text" placeholder="الاسم بالعربي" autocomplete="username">
+   <input id="lgPass" type="password" placeholder="الرقم السري" autocomplete="current-password">
+   <button class="btn full" id="lgBtn" style="margin-top:14px" onclick="doLogin()">دخول</button>
+   <p id="lgErr" class="note bad" style="min-height:20px"></p>
+   <button class="linkb" onclick="showBoot()">أول مرة؟ إعداد حساب الأدمن</button>
+  </div>
+  <div id="lgBoot" style="display:none">
+   <p class="small">مرة وحدة بس: إنشاء حساب الأدمن (أنت)</p>
+   <input id="bName" type="text" placeholder="اسمك بالعربي">
+   <input id="bPass" type="password" placeholder="رقم سري (6 خانات أو أكثر)" autocomplete="new-password">
+   <input id="bPass2" type="password" placeholder="تأكيد الرقم السري" autocomplete="new-password">
+   <button class="btn full" id="bBtn" style="margin-top:14px" onclick="doBoot()">إنشاء حساب الأدمن</button>
+   <p id="bErr" class="note bad"></p>
+   <button class="linkb" onclick="lgShow('lgMain')">رجوع</button>
+  </div>
+  <div id="lgWait" style="display:none"><p class="small">جاري التحميل...</p></div>
+  <div id="lgNo" style="display:none"><p id="lgNoT" class="note bad"></p><button class="btn sec full" style="margin-top:10px" onclick="FBA.logout().then(()=>location.reload())">تسجيل خروج</button></div>
+ </div>
+</div>
 
 <div id="lock">
   <h1>🔒 المواجيد</h1>
@@ -155,7 +195,7 @@ nav button{font-size:11px}
 <main>
 <!-- ======= الموجود ======= -->
 <section class="view on" id="v-today">
-  <button class="btn sec full" style="margin-bottom:12px" onclick="openMsg()">📩 تحديث الموجود من رسالة</button>
+  <button class="btn sec full ed" style="margin-bottom:12px" onclick="openMsg()">📩 تحديث الموجود من رسالة</button>
   <div class="card" id="errBar" style="display:none;background:#fdecea;border-color:#f0b9b1;color:#8e1f18;font-size:14px;cursor:pointer;padding:12px 14px" onclick="openErr()"></div>
   <div class="card" id="dueBar" style="display:none;background:#fff4e0;border-color:#f0d39a;color:#7a5410;font-size:14px;cursor:pointer;padding:12px 14px" onclick="openDue()"></div>
   <div class="stats">
@@ -165,6 +205,7 @@ nav button{font-size:11px}
   </div>
   <div class="reasons" id="reasonSum"></div>
   <div class="note" id="checkNote"></div>
+  <div class="card" id="apCard" style="margin-top:12px;display:none"></div>
 
   <div class="card" id="kidsCard" style="margin-top:12px;display:none">
     <b id="kidsTitle"></b>
@@ -257,7 +298,7 @@ nav button{font-size:11px}
     <label class="l" style="margin-top:0">الفصيل / الدفعة</label>
     <select id="leafSel" onchange="stLeaf=this.value;renderStudents()"></select>
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>📥 استيراد الأسماء من ملف إكسل</b>
     <p class="small">الملف يُقرأ داخل جوالك فقط وما يطلع لأي مكان. الأعمدة: رقم التسجيل، الاسم، السرية، الفصيل (السرية والفصيل لدفعة المستجدين فقط).</p>
     <label class="l">الدفعة</label>
@@ -265,7 +306,7 @@ nav button{font-size:11px}
     <button class="btn full" style="margin-top:10px" onclick="document.getElementById('xlFile').click()">اختيار ملف الإكسل</button>
     <input id="xlFile" type="file" accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" style="display:none" onchange="impRead(this)">
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>إضافة طالب</b>
     <div class="row" style="margin-top:8px">
       <input id="addReg" type="text" inputmode="numeric" placeholder="رقم التسجيل" style="flex:.6">
@@ -273,7 +314,7 @@ nav button{font-size:11px}
     </div>
     <button class="btn full" style="margin-top:8px" onclick="addStudent()">إضافة</button>
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>إضافة مجموعة دفعة وحدة</b>
     <p class="small">الصق القائمة (من الإكسل أو الواتساب)، كل طالب في سطر: رقم التسجيل ثم الاسم.</p>
     <textarea id="bulk" rows="6" placeholder="1001 محمد أحمد العتيبي&#10;1002 خالد سعد القحطاني"></textarea>
@@ -281,7 +322,7 @@ nav button{font-size:11px}
   </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <b>الطلبة</b><span class="small"><span id="stCount"></span> <button class="tb" style="background:var(--warn2);color:var(--warn);margin-right:6px" onclick="delAllStudents()">حذف الكل</button></span>
+      <b>الطلبة</b><span class="small"><span id="stCount"></span> <button class="tb adm" style="background:var(--warn2);color:var(--warn);margin-right:6px" onclick="delAllStudents()">حذف الكل</button></span>
     </div>
     <input id="search2" type="text" placeholder="🔍 بحث" style="margin-top:8px" oninput="renderStudents()">
     <ul class="list" id="allList"></ul>
@@ -290,18 +331,33 @@ nav button{font-size:11px}
 
 <!-- ======= الإعدادات ======= -->
 <section class="view" id="v-settings">
-  <div class="card">
+  <div class="card" id="meCard"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="meInfo"></div><button class="btn sec" style="flex:0 0 auto" onclick="logout()">تسجيل خروج</button></div></div>
+  <div class="card adm" id="accCard">
+    <b>👥 الحسابات</b>
+    <p class="small">أنت تسوي حساب لكل مدرب ومسؤول ومشرف: الاسم بالعربي والرقم السري والصلاحية. إذا أحد نسى رقمه افتح حسابه وحط له رقم جديد.</p>
+    <button class="btn full" onclick="openUser(null)">＋ حساب جديد</button>
+    <ul class="list" id="usrList" style="margin-top:8px"></ul>
+    <details style="margin-top:10px"><summary class="small">رابط السيرفر (للخطة المدفوعة فقط — اتركه فاضي)</summary>
+      <div class="row" style="margin-top:6px"><input id="apiIn" type="url" dir="ltr" placeholder="https://..."><button class="btn sec" style="flex:0 0 auto" onclick="saveApi()">حفظ وفحص</button></div></details>
+  </div>
+  <div class="card adm">
+    <b>📜 سجل الدخول والعمليات</b>
+    <p class="small">مين دخل، ومين أرسل واعتمد ورفض وعدّل، ومتى.</p>
+    <button class="btn sec full" onclick="loadAudit()">عرض آخر العمليات</button>
+    <ul class="list" id="audList" style="margin-top:8px"></ul>
+  </div>
+  <div class="card adm">
     <b>⭐ المجموعات</b>
     <p class="small">تجمع سرايا أو فصائل أو دفعات تحت اسم واحد (مثل الصمود = السرية الأولى والثانية) عشان تعزل موجودها أو تجمعه. تطلع في القائمة اللي فوق.</p>
     <ul class="list" id="grpList"></ul>
     <button class="btn sec full" style="margin-top:8px" onclick="editGroup(null)">＋ مجموعة جديدة</button>
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>الدفعات والسرايا والفصائل</b>
     <p class="small">اضغط «✏️ تحرير» عند أي دورة لتغيير اسمها أو رقمها أو مختصرها.</p>
     <div id="treeEd"></div>
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>إضافة دفعة جديدة</b>
     <div class="row" style="margin-top:8px">
       <input id="nbName" type="text" placeholder="اسم الدفعة">
@@ -317,7 +373,7 @@ nav button{font-size:11px}
   </div>
   <div class="card">
     <b>الرمز السري</b>
-    <p class="small" id="pinState"></p>
+    <p class="small">يقفل البرنامج على هذا الجهاز كل ما تطلع منه (إضافة على الاسم والرقم السري).</p><p class="small" id="pinState"></p>
     <input id="pinIn" type="password" inputmode="numeric" placeholder="رمز جديد (4 أرقام أو أكثر)">
     <div class="row" style="margin-top:8px">
       <button class="btn" onclick="setPin()">حفظ الرمز</button>
@@ -332,9 +388,9 @@ nav button{font-size:11px}
       <button class="btn sec" id="restoreBtn" onclick="restoreSnap()">استرجاع نسخة تلقائية</button>
     </div>
   </div>
-  <div class="card">
+  <div class="card adm">
     <b>النسخ الاحتياطي</b>
-    <p class="small">البيانات محفوظة على جوالك فقط. خذ نسخة احتياطية بين فترة وفترة. تقدر تصدّر وتستورد دورة أو سرية أو فصيل لحاله بدون ما يتأثر الباقي.</p>
+    <p class="small">البيانات محفوظة في السيرفر. تقدر تصدّر نسخة احتياطية على جوالك، أو تستورد نسخة لدورة أو سرية أو فصيل بدون ما يتأثر الباقي.</p>
     <label class="l" style="margin-top:0">نطاق التصدير</label>
     <select id="expScope" style="margin-bottom:10px"></select>
     <div class="row">
@@ -391,10 +447,10 @@ nav button{font-size:11px}
 
 <nav>
   <button class="on" data-v="today" onclick="go('today')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>الموجود</button>
-  <button data-v="kashf" onclick="go('kashf')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8.5 10l1.5 1.5 3-3M8.5 16l1.5 1.5 3-3M15 11h1M15 17h1"/></svg>الكشوف</button>
+  <button class="ed" data-v="kashf" onclick="go('kashf')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M8.5 10l1.5 1.5 3-3M8.5 16l1.5 1.5 3-3M15 11h1M15 17h1"/></svg>الكشوف</button>
   <button data-v="report" onclick="go('report')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>التقرير</button>
-  <button data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>إنشاء كشف</button>
-  <button data-v="students" onclick="go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5.5"/></svg>الطلبة</button>
+  <button class="dt" data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>إنشاء كشف</button>
+  <button class="ed" data-v="students" onclick="go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5.5"/></svg>الطلبة</button>
   <button data-v="settings" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>الإعدادات</button>
 </nav>
 
@@ -434,6 +490,7 @@ nav button{font-size:11px}
   </div>
 </div>
 
+<div class="sheet-bg" id="uSheet" onclick="if(event.target===this)closeUser()"><div class="sheet"><h3 id="uTitle"></h3><div id="uBody"></div></div></div>
 <div class="sheet-bg" id="confirm" onclick="if(event.target===this)closeConfirm()">
   <div class="sheet">
     <h3 id="cfMsg"></h3>
@@ -445,7 +502,7 @@ nav button{font-size:11px}
   </div>
 </div>
 
-<button id="fab" onclick="openFab()">＋ متفرقة</button>
+<button id="fab" class="ed" onclick="openFab()">＋ متفرقة</button>
 <div class="sheet-bg" id="fabSheet" onclick="if(event.target===this)closeFab()">
   <div class="sheet">
     <h3>المتفرقة</h3>
@@ -488,6 +545,58 @@ nav button{font-size:11px}
 <div class="toast" id="toast"></div>
 <div id="upd"><b>🔄 يوجد تحديث جديد للبرنامج</b><button onclick="applyUpdate()">تحديث الآن</button></div>
 
+<script type="module">
+// الاتصال بـ Firebase
+const CFG = {
+  apiKey: "AIzaSyAh1TIU7QnbIwHnjQZxkd7l3E0vQCaWgdg",
+  authDomain: "mawajeed-3669a.firebaseapp.com",
+  projectId: "mawajeed-3669a",
+  storageBucket: "mawajeed-3669a.firebasestorage.app",
+  messagingSenderId: "143038217101",
+  appId: "1:143038217101:web:6e7f4a90fc36b685f1dbc4"
+};
+const B = 'https://www.gstatic.com/firebasejs/13.2.0/';
+try {
+  const [{ initializeApp }, A, F] = await Promise.all([import(B + 'firebase-app.js'), import(B + 'firebase-auth.js'), import(B + 'firebase-firestore.js')]);
+  const app = initializeApp(CFG), auth = A.getAuth(app);
+  let db;
+  try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+  catch (e) { db = F.getFirestore(app); }
+  const DEL = { __del: 1 };
+  // نسخة ثانية من الدخول: يسوي الأدمن فيها حسابات الآخرين بدون ما يطلع من حسابه
+  let auth2 = null;
+  const a2 = () => { if (!auth2) auth2 = A.initializeAuth(initializeApp(CFG, 'adm'), { persistence: A.inMemoryPersistence }); return auth2; };
+  const ref = p => F.doc(db, ...p.split('/'));
+  window.FBA = {
+    DEL,
+    onAuth: cb => A.onAuthStateChanged(auth, u => cb(u ? { uid: u.uid } : null)),
+    login: (e, p) => A.signInWithEmailAndPassword(auth, e, p),
+    logout: async () => { await A.signOut(auth); try { await F.terminate(db); await F.clearIndexedDbPersistence(db); } catch (e) { } },
+    token: () => auth.currentUser.getIdToken(),
+    uid: () => auth.currentUser && auth.currentUser.uid,
+    signup: (e, p) => A.createUserWithEmailAndPassword(auth, e, p).then(c => c.user.uid),
+    subCreate: async (e, p) => { const au = a2(); const c = await A.createUserWithEmailAndPassword(au, e, p); const id = c.user.uid; await A.signOut(au); return id; },
+    subSetPass: async (e, old, np) => { const au = a2(); const c = await A.signInWithEmailAndPassword(au, e, old); await A.updatePassword(c.user, np); await A.signOut(au); },
+    subDelete: async (e, p) => { const au = a2(); const c = await A.signInWithEmailAndPassword(au, e, p); await A.deleteUser(c.user); },
+    get: p => F.getDoc(ref(p)).then(s => s.exists() ? s.data() : null),
+    watch: (p, cb, er) => F.onSnapshot(ref(p), s => cb(s.exists() ? s.data() : null), er),
+    watchColl: (c, cb, er) => F.onSnapshot(F.collection(db, c), q => cb(q.docs.map(d => Object.assign({ id: d.id }, d.data()))), er),
+    commit: ops => {
+      const b = F.writeBatch(db);
+      ops.forEach(o => {
+        const r = ref(o.path);
+        if (o.op === 'set') b.set(r, o.data);
+        else if (o.op === 'del') b.delete(r);
+        else { const a = []; o.pairs.forEach(([f, v]) => a.push(new F.FieldPath(...f), v === DEL ? F.deleteField() : v)); b.update(r, ...a); }
+      });
+      return b.commit();
+    },
+    recent: (c, f, n) => F.getDocs(F.query(F.collection(db, c), F.orderBy(f, 'desc'), F.limit(n))).then(q => q.docs.map(d => Object.assign({ id: d.id }, d.data())))
+  };
+} catch (e) { console.error(e); window.FBA_ERR = e; }
+window.dispatchEvent(new Event('fba'));
+
+</script>
 <script>
 const REASONS=[
   {k:'hosp',t:'دخول المستشفى',s:'مستشفى',c:'var(--r1)',fx:'open'},
@@ -504,7 +613,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.19.0';
+const APP_VERSION='2.0.0';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -524,7 +633,7 @@ const byReg=(a,b)=>a.reg.localeCompare(b.reg,undefined,{numeric:true});
 function mk(name,extra){return Object.assign({id:uid(),name,children:[],students:[],days:{}},extra||{})}
 function mkBatch(name,num,co,pl,abbr){const b=mk(name,{num:num||'',abbr:abbr||''});for(let i=1;i<=co;i++){const c=mk('السرية '+ord(i,1));for(let j=1;j<=pl;j++)c.children.push(mk('الفصيل '+ord(j)));b.children.push(c)}return b}
 function load(){
-  try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+  if(!ONLINE){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}}
   if(!S||!S.batches){
     S={v:2,batches:[],scope:'all',pin:null,dets:[]};
     let old=null;try{old=JSON.parse(localStorage.getItem(OLDKEY))}catch(e){}
@@ -538,7 +647,7 @@ function load(){
   S.batches.forEach(b=>leaves(b).forEach(l=>l.students.forEach(st=>(st.fx||[]).forEach(e=>{if(e.k==='home'&&e.days&&!e.due&&e.end&&e.end===addDays(e.since,e.days)&&e.end>today()){e.due=e.end;e.end=null}}))));
   reindex();if(!IDX[S.scope])S.scope='all';
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('تعذر الحفظ!')}}
+function localSave(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('تعذر الحفظ!')}}
 function reindex(){IDX={};ROOT.children=S.batches;const w=(n,p,d)=>{IDX[n.id]={n,p,d};n.children.forEach(c=>w(c,n,d+1))};w(ROOT,null,0);
   // المجموعات: وحدات افتراضية تجمع سرايا/فصائل/دفعات (مثل الصمود = س1+س2) بدون ما تغيّر الهيكل
   (S.groups||[]).forEach(g=>{const ch=g.members.map(id=>IDX[id]&&IDX[id].n).filter(Boolean);IDX[g.id]={n:{id:g.id,name:g.name,virtual:1,children:ch,students:[],days:{}},p:ROOT,d:1}})}
@@ -731,7 +840,7 @@ function drawSheet(){
   h+=`<b style="font-size:14px">لليوم فقط</b><div class="dgrid" style="margin:8px 0 12px">`+RDAY.map(r=>ob(r,!fx&&cur===r.k,`pick('${r.k}')`,fx)).join('')+`</div>`+
     (!fx&&cur?`<button class="opt" onclick="pick(null)" style="color:var(--pri)">✓ موجود (إلغاء متفرقة اليوم)</button>`:'');
   {const n=stEpisodes(l,s).length;h+=`<button class="btn sec full" style="margin-bottom:10px" onclick="openHist('${l.id}','${esc(s.reg)}')">📜 سجل المتفرقة (${n})</button>`}
-  h+=`<label class="l">ملاحظة دائمة عند اسمه (مثل: موسيقى، يعمل شركة)</label><div class="row"><input id="shMemo" type="text" value="${esc(s.memo||'')}" placeholder="بدون"><button class="btn sec" style="flex:0 0 auto" onclick="saveMemo()">حفظ</button></div><div style="height:10px"></div>`;
+  if(isAdm())h+=`<label class="l">ملاحظة دائمة عند اسمه (مثل: موسيقى، يعمل شركة)</label><div class="row"><input id="shMemo" type="text" value="${esc(s.memo||'')}" placeholder="بدون"><button class="btn sec" style="flex:0 0 auto" onclick="saveMemo()">حفظ</button></div><div style="height:10px"></div>`;
   document.getElementById('shOpts').innerHTML=h;
   if(sel){document.getElementById('shSince').addEventListener('input',shPrev);shPrev()}
 }
@@ -1618,7 +1727,7 @@ function partRender(){
   const P=PIMP,cur=P.src[P.si];let h=`<label class="l" style="margin-top:0">وش تستورد من الملف؟</label><select onchange="PIMP.si=+this.value;PIMP.ti=null;partRender()">${P.src.map((x,i)=>`<option value="${i}" ${i===P.si?'selected':''}>${esc(x.label)}${x.all?'':` (${cntSt(x.n)} طالب)`}</option>`).join('')}</select>`;
   const y=document.getElementById('cfYes');
   if(cur.all){h+=`<p class="note bad" style="text-align:right">⚠️ هذا يستبدل كل البيانات في جوالك بالنسخة المستوردة.</p>`;
-    y.textContent='استبدال الكل';y.onclick=()=>{closeConfirm();snapshot('قبل استيراد نسخة كاملة');S=P.d;save();load();renderAll();toast('تم الاستيراد ✓')}}
+    y.textContent='استبدال الكل';y.onclick=()=>{closeConfirm();snapshot('قبل استيراد نسخة كاملة');S=Object.assign(P.d,loadPrefs());load();save();renderAll();toast('تم الاستيراد ✓')}}
   else{const tg=partTargets(cur.n);
     if(!tg.length){h+=`<p class="note bad">ما فيه وحدة مطابقة في جوالك.</p>`;y.textContent='—';y.onclick=()=>{}}
     else{if(P.ti===null){const byId=tg.findIndex(t=>t.id===cur.n.id),byName=tg.findIndex(t=>fullLabel(t)===cur.label);P.ti=byId>=0?byId:byName>=0?byName:0}
@@ -1661,12 +1770,360 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
 
 window.addEventListener('error',e=>{try{toast('خطأ: '+(e.message||'غير معروف'))}catch(_){}});
 window.addEventListener('unhandledrejection',e=>{try{toast('خطأ: '+((e.reason&&e.reason.message)||e.reason))}catch(_){}});
+/* ==================== النسخة الأون لاين ==================== */
+// البيانات في Firebase. كل فصيل مستند فيه: الطلبة (الأدمن فقط) + المتفرقة المستمرة (fx) + المواجيد اليومية (days).
+// كل تعديل يمر على save() ← pushChanges() اللي تقارن مع آخر نسخة من السيرفر وترسل الفرق بس، وتطبّق الصلاحيات والاعتماد.
+const ROLES={admin:'أدمن',ba:'مسؤول دفعة',gr:'مسؤول دورة',co:'مسؤول سرية',tr:'مدرب فصيل',view:'إشراف (مشاهدة فقط)'};
+const ROLE_ORDER=['admin','ba','gr','co','tr','view'];
+const LVN={co:'مسؤول السرية',gr:'مسؤول الدورة',ba:'مسؤول الدفعة'};
+const PREFS=['scope','pin','repLine','repDetail','spec','specFrom','specTo','specMode'];
+let ME=null,READY=false,SY={tree:undefined,leaves:{},dets:{}},RAW={tree:undefined,leaves:{},dets:{}},SUBS={},LOADED=new Set(),USERS=[],CONF={},AUDIT=null,RB=null,BOOTED=false;
+let DEL=null;
+
+function canon(v){if(v===undefined)return 'u';if(v===null||typeof v!=='object')return JSON.stringify(v);if(Array.isArray(v))return '['+v.map(canon).join(',')+']';return '{'+Object.keys(v).filter(k=>v[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}'}
+function clone(v){return v===undefined?undefined:JSON.parse(JSON.stringify(v))}
+function nowT(){return new Date().toISOString()}
+function tf(t){if(!t)return '';const d=new Date(t);if(isNaN(d))return '';const p=n=>String(n).padStart(2,'0');return `${t12(p(d.getHours())+':'+p(d.getMinutes()))} ${p(d.getDate())}/${p(d.getMonth()+1)}`}
+const isAdm=()=>!!ME&&ME.role==='admin';
+const canEdit=()=>!!ME&&ME.role!=='view';
+const isSupR=()=>!!ME&&['admin','ba','gr','co'].includes(ME.role);
+const canDet=()=>!!ME&&['admin','ba','gr'].includes(ME.role);
+function errMsg(e){const c=(e&&e.code)||'';if(/permission/.test(c))return 'ما عندك صلاحية لهذا';if(/unavailable|network/.test(c))return 'ما فيه اتصال — ينحفظ لما يرجع النت';return (e&&e.message)||String(e)}
+
+/* ---------- الاسم ← إيميل داخلي ---------- */
+function nameKey(s){return String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/ـ/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ً-ْ]/g,'').replace(/\s+/g,' ').trim().toLowerCase()}
+async function nameEmail(n){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(nameKey(n)));return 'u'+[...new Uint8Array(b)].slice(0,16).map(x=>x.toString(16).padStart(2,'0')).join('')+'@mawajeed.app'}
+
+/* ---------- إعدادات الجهاز (لكل حساب) ---------- */
+function prefKey(){return 'mawajeed_prefs_'+(ME?ME.uid:'x')}
+function savePrefs(){if(!ME||!S)return;try{const o={};PREFS.forEach(k=>{if(S[k]!==undefined)o[k]=S[k]});localStorage.setItem(prefKey(),JSON.stringify(o))}catch(e){}}
+function loadPrefs(){try{return JSON.parse(localStorage.getItem(prefKey()))||{}}catch(e){return {}}}
+
+/* ---------- الهيكل ---------- */
+function treeOf(bs){const w=n=>({id:n.id,name:n.name,num:n.num||'',abbr:n.abbr||'',children:(n.children||[]).map(w)});return (bs||[]).map(w)}
+function treeRepr(){return {batches:treeOf(S.batches),groups:clone(S.groups||[])}}
+function treeLeafIds(t){const out=new Set();const w=n=>{if(n.children&&n.children.length)n.children.forEach(w);else out.add(n.id)};((t&&t.batches)||[]).forEach(w);return out}
+function treeAllIds(t){const out=new Set();const w=n=>{out.add(n.id);(n.children||[]).forEach(w)};((t&&t.batches)||[]).forEach(w);((t&&t.groups)||[]).forEach(g=>out.add(g.id));return out}
+function leafRepr(l){const fx={};const students=l.students.map(s=>{const o=clone(s);delete o.fx;if(s.fx&&s.fx.length)fx[s.reg]=clone(s.fx);return o});return {students,fx,days:clone(l.days)||{}}}
+function attachFx(students,fx){return clone(students||[]).map(s=>{if(fx&&fx[s.reg]&&fx[s.reg].length)s.fx=clone(fx[s.reg]);return s})}
+function myLeafIds(){return isAdm()?[...treeLeafIds(SY.tree)]:(ME.leaves||[])}
+function myDetGroups(){if(isAdm()){const t=SY.tree||{};return [...(t.batches||[]).map(b=>b.id),...(t.groups||[]).map(g=>g.id)]}return canDet()?(ME.dg||[]):[]}
+
+function buildS(){
+  const pr=loadPrefs(),t=SY.tree||{batches:[],groups:[]},adm=isAdm(),keep=new Set(myLeafIds());
+  const mkN=x=>{const n={id:x.id,name:x.name,num:x.num||'',abbr:x.abbr||'',children:[],students:[],days:{}};
+    if(x.children&&x.children.length){n.children=x.children.map(mkN).filter(Boolean);return n.children.length?n:null}
+    if(!adm&&!keep.has(x.id))return null;
+    const d=SY.leaves[x.id];if(d){n.students=attachFx(d.students,d.fx);n.days=clone(d.days||{})}
+    return n};
+  const batches=(t.batches||[]).map(mkN).filter(Boolean);
+  const ids=new Set();const w=n=>{ids.add(n.id);n.children.forEach(w)};batches.forEach(w);
+  const groups=clone(t.groups||[]).map(g=>({...g,members:(g.members||[]).filter(m=>ids.has(m))})).filter(g=>adm||g.members.length);
+  const dets=[];Object.keys(SY.dets).forEach(g=>(SY.dets[g]||[]).forEach(d=>dets.push({...clone(d),grp:g})));
+  S=Object.assign({v:2,batches,groups,dets},pr);
+  load();
+  if(pr.scope===undefined||!IDX[S.scope]){const sc=(ME.scope||[]).find(id=>IDX[id]);S.scope=sc||(!adm&&leaves(ROOT).length===1?leaves(ROOT)[0].id:'all')}
+}
+function revertLeaf(l,old){l.students=attachFx(old.students,old.fx);l.days=clone(old.days||{})}
+
+/* ---------- الاعتماد ---------- */
+function lvChain(l){const d=IDX[l.id]?IDX[l.id].d:1,a=[];if(d>=3)a.push('co');if(groupOf(l))a.push('gr');a.push('ba');return a}
+function ck(d){return canon({p:d&&hasPresent(d)?Number(d.present):null,a:(d&&d.abs)||{},o:(d&&d.ok)||{}})}
+function locked(d){return !!d&&d.st==='sub'}
+function addLog(d,e){d.log=(d.log||[]).concat([e]).slice(-15)}
+function applyEdit(l,d,lv,who){const ch=lvChain(l),upto=lv==='admin'?ch.length-1:ch.indexOf(lv);d.ap={};for(let i=0;i<=upto;i++)d.ap[ch[i]]=Object.assign({},who,{e:1});d.st='sub';d.by=who;delete d.rej;addLog(d,Object.assign({a:'تعديل'},who))}
+function stInfo(l,date=curDate){const d=l.days[date];
+  if(d&&d.st==='rej')return {k:'rej',t:`↩️ مرفوض من ${d.rej?d.rej.n:''}`+(d.rej&&d.rej.why?` — ${d.rej.why}`:'')};
+  if(!d||(!hasPresent(d)&&!d.st))return {k:'none',t:'لم يُدخل الموجود'};
+  if(d.st!=='sub')return {k:'draft',t:'✏️ لم يُرسل للاعتماد'};
+  const ap=d.ap||{},next=lvChain(l).find(x=>!ap[x]);
+  return next?{k:'sub',t:'⏳ بانتظار اعتماد '+LVN[next],next}:{k:'ok',t:'✅ معتمد'}}
+function myIdx(l){return isAdm()?99:lvChain(l).indexOf(ME.role)}
+function canApprove(l){if(!ME||!isSupR())return false;const s=stInfo(l);if(s.k!=='sub')return false;if(isAdm())return true;const i=myIdx(l);return i>=0&&!((l.days[curDate].ap||{})[ME.role])}
+function canReject(l){if(!ME||!isSupR())return false;const s=stInfo(l);if(s.k!=='sub'&&s.k!=='ok')return false;if(isAdm())return true;const ch=lvChain(l),i=ch.indexOf(ME.role),ap=l.days[curDate].ap||{};return i>=0&&!ch.slice(i+1).some(x=>ap[x])}
+function who(){return {n:ME.name,t:nowT()}}
+function apSubmit(id){const l=N(id),k=calc(l);if(!l.days[curDate])l.days[curDate]={present:null,abs:{}};const d=l.days[curDate];
+  if(!hasPresent(d))d.present=Math.max(0,k.total-k.marked);
+  if(Number(d.present)+calc(l).marked!==calc(l).total)return toast('⚠️ الأعداد غير مطابقة — صحّح الحالي أو المتفرقة قبل الإرسال');
+  d.st='sub';d.sub=who();d.ap={};delete d.rej;addLog(d,Object.assign({a:'إرسال'},who()));save();audit('إرسال للاعتماد',l);renderAll();toast('📤 تم الإرسال للاعتماد')}
+function apWithdraw(id){const l=N(id),d=l.days[curDate];if(!d||d.st!=='sub'||Object.keys(d.ap||{}).length)return toast('ما تقدر تسحبه — اعتمده المسؤول');d.st='draft';delete d.sub;addLog(d,Object.assign({a:'سحب'},who()));save();renderAll();toast('رجع للتعديل')}
+function apApprove(id,quiet){const l=N(id);if(!canApprove(l))return;const d=l.days[curDate],ch=lvChain(l),upto=isAdm()?ch.length-1:ch.indexOf(ME.role);d.ap=d.ap||{};
+  for(let i=0;i<=upto;i++)if(!d.ap[ch[i]])d.ap[ch[i]]=who();addLog(d,Object.assign({a:'اعتماد'},who()));
+  if(!quiet){save();audit('اعتماد',l);renderAll();toast('✅ تم الاعتماد')}}
+function apApproveAll(){const ls=leaves(scopeN()).filter(canApprove);if(!ls.length)return;ask(`اعتماد ${ls.length} ${ls.length>2?'فصائل':'فصيل'}؟`,()=>{ls.forEach(l=>{apApprove(l.id,true);audit('اعتماد',l)});save();renderAll();toast(`✅ تم اعتماد ${ls.length}`)})}
+function apReject(id){const l=N(id);if(!canReject(l))return;
+  form(`رفض موجود ${fullLabel(l)}`,`<label class="l" style="margin-top:0">سبب الرفض (يوصل للمدرب)</label><input id="rjWhy" type="text" placeholder="مثال: الحالي غلط، راجع الغياب">`,()=>{
+    const d=l.days[curDate],why=(document.getElementById('rjWhy')||{}).value||'';d.st='rej';d.rej=Object.assign({why:why.trim()},who());d.ap={};addLog(d,Object.assign({a:'رفض',x:why.trim()},who()));save();audit('رفض',l,why.trim());renderAll();toast('↩️ رجع للمدرب للتعديل')},'رفض وإرجاع')}
+function lockMsg(l){if(ME&&ME.role==='tr'&&locked(l.days[curDate]))return 'الموجود مرسل للاعتماد — اسحب الإرسال أو اطلب من المسؤول إرجاعه للتعديل';return ''}
+function audit(a,l,x){if(!ME||!READY||!window.FBA)return;const e={uid:ME.uid,n:ME.name,r:ME.role,a,t:nowT()};if(l){e.l=l.id;e.u=fullLabel(l);e.d=curDate}if(x)e.x=String(x).slice(0,200);
+  FBA.commit([{op:'set',path:'audit/'+uid(),data:e}]).catch(()=>{})}
+
+/* ---------- الحفظ: إرسال الفرق للسيرفر ---------- */
+function save(){savePrefs();if(ME&&READY&&window.FBA)pushChanges()}
+function pushChanges(){
+  const ops=[],adm=isAdm(),role=ME.role,w=who(),prevLeaves=treeLeafIds(SY.tree),reverted=[];let treeCh=false;
+  if(adm){const tr=treeRepr();if(canon(tr)!==canon(SY.tree)){ops.push({op:'set',path:'meta/tree',data:tr});SY.tree=clone(tr);treeCh=true}}
+  const all=[],seen=new Set();S.batches.forEach(b=>leaves(b).forEach(l=>all.push(l)));
+  for(const l of all){seen.add(l.id);const old=SY.leaves[l.id];
+    if(old===undefined&&prevLeaves.has(l.id))continue; // لسه ما وصلت من السيرفر — لا نكتب فوقها
+    if(!old){if(adm){const c=leafRepr(l);ops.push({op:'set',path:'leaves/'+l.id,data:c});SY.leaves[l.id]=clone(c)}continue}
+    let cur=leafRepr(l);if(canon(cur)===canon(old))continue;
+    if(role==='view'){revertLeaf(l,old);reverted.push('view');continue}
+    if(!adm&&canon(cur.students)!==canon(old.students)){revertLeaf(l,old);reverted.push('st');continue}
+    const od=old.days||{},ofx=old.fx||{};
+    const fxCh=[...new Set([...Object.keys(cur.fx),...Object.keys(ofx)])].some(r=>canon(cur.fx[r])!==canon(ofx[r]));
+    const dates=[...new Set([...Object.keys(l.days),...Object.keys(od)])].filter(d=>canon(l.days[d])!==canon(od[d]));
+    if(role==='tr'){
+      if(fxCh&&locked(od[curDate])){revertLeaf(l,old);reverted.push('lock');continue}
+      dates.forEach(d=>{const o=od[d],n=l.days[d];if(ck(n)===ck(o))return;
+        if(locked(o)){if(o)l.days[d]=clone(o);else delete l.days[d];reverted.push('lock');return}
+        if(n)n.by=w});
+    }else{
+      const touched=new Set(dates.filter(d=>ck(l.days[d])!==ck(od[d])));
+      if(fxCh&&l.days[curDate]&&hasPresent(l.days[curDate]))touched.add(curDate);
+      touched.forEach(d=>{const n=l.days[d];if(n&&(hasPresent(n)||n.st||Object.keys(n.abs||{}).length))applyEdit(l,n,adm?'admin':role,w)});
+      if(touched.size&&!adm)audit('تعديل',l,[...touched].sort().map(dm).join('، '));
+    }
+    cur=leafRepr(l);const pairs=[];
+    if(canon(cur.students)!==canon(old.students))pairs.push([['students'],cur.students]);
+    [...new Set([...Object.keys(cur.fx),...Object.keys(ofx)])].forEach(r=>{if(canon(cur.fx[r])!==canon(ofx[r]))pairs.push([['fx',r],cur.fx[r]===undefined?DEL:cur.fx[r]])});
+    [...new Set([...Object.keys(cur.days),...Object.keys(od)])].forEach(d=>{if(canon(cur.days[d])!==canon(od[d]))pairs.push([['days',d],cur.days[d]===undefined?DEL:cur.days[d]])});
+    if(pairs.length){ops.push({op:'upd',path:'leaves/'+l.id,pairs});SY.leaves[l.id]=clone(cur)}
+  }
+  if(adm)Object.keys(SY.leaves).forEach(id=>{if(!seen.has(id)&&SY.leaves[id]){ops.push({op:'del',path:'leaves/'+id});delete SY.leaves[id]}});
+  if(canDet()){const gs={};(S.dets||[]).forEach(d=>{if(!d.grp)d.grp=detGrp(d);(gs[d.grp]=gs[d.grp]||[]).push(d)});
+    new Set([...Object.keys(gs),...Object.keys(SY.dets)]).forEach(g=>{const cur=(gs[g]||[]).map(d=>{const o=clone(d);delete o.grp;return o}),old=SY.dets[g];
+      if(canon(cur)===canon(old||[]))return;if(!adm&&!(ME.dg||[]).includes(g))return;
+      ops.push({op:'set',path:'dets/'+g,data:{items:cur}});SY.dets[g]=clone(cur)})}
+  if(ops.length)FBA.commit(ops).catch(e=>toast('تعذر الحفظ: '+errMsg(e)));
+  if(treeCh)refreshUserScopes();
+  if(reverted.length){const m=reverted.includes('lock')?lockMsg({days:{[curDate]:{st:'sub'}}}):reverted.includes('view')?'حسابك مشاهدة فقط':'تعديل بيانات الطلبة للأدمن فقط';setTimeout(()=>{toast(m);renderAll()},30)}
+}
+function detGrp(d){if(ME.role==='gr'){const g=(ME.dg||[])[0];if(g)return g}return d.batchId}
+
+/* ---------- الاستماع للسيرفر ---------- */
+function sub(key,fn){if(SUBS[key])return;SUBS[key]=fn()}
+function unsub(key){if(SUBS[key]){try{SUBS[key]()}catch(e){}delete SUBS[key]}}
+function gotSnap(kind,id,data){
+  if(kind==='tree'){RAW.tree=data;if(canon(data)!==canon(SY.tree)){SY.tree=clone(data);syncSubs()}}
+  else{const box=kind==='leaf'?'leaves':'dets';const v=kind==='det'?(data?data.items||[]:null):data;RAW[box][id]=v;
+    if(canon(v)!==canon(SY[box][id])){SY[box][id]=clone(v);LOADED.add(kind+id);schedule();return}}
+  LOADED.add(kind+(id||''));schedule()}
+function syncSubs(){if(!ME)return;
+  const want=new Set();
+  myLeafIds().forEach(id=>{want.add('leaf:'+id);sub('leaf:'+id,()=>FBA.watch('leaves/'+id,d=>gotSnap('leaf',id,d),e=>{LOADED.add('leaf'+id);SY.leaves[id]=null;schedule()}))});
+  myDetGroups().forEach(g=>{want.add('det:'+g);sub('det:'+g,()=>FBA.watch('dets/'+g,d=>gotSnap('det',g,d),e=>{LOADED.add('det'+g);schedule()}))});
+  Object.keys(SUBS).forEach(k=>{if((k.startsWith('leaf:')||k.startsWith('det:'))&&!want.has(k)){unsub(k);const id=k.split(':')[1];if(k[0]==='l')delete SY.leaves[id];else delete SY.dets[id]}});
+  schedule()}
+function allLoaded(){if(SY.tree===undefined)return false;return myLeafIds().every(id=>LOADED.has('leaf'+id))&&myDetGroups().every(g=>LOADED.has('det'+g))}
+function schedule(){clearTimeout(RB);RB=setTimeout(rebuild,120)}
+function rebuild(){
+  if(!ME)return;
+  if(!READY){if(!allLoaded())return;READY=true;showApp()}
+  const a=document.activeElement;if(a&&/INPUT|TEXTAREA/.test(a.tagName)&&a.type!=='file'&&!a.closest('#login')&&document.getElementById('v-'+view)&&document.getElementById('v-'+view).contains(a)){RB=setTimeout(rebuild,900);return}
+  buildS();renderAll();
+  if(document.getElementById('sheet').classList.contains('on')&&IDX[shL])try{drawSheet()}catch(e){}
+}
+
+/* ---------- الدخول والخروج ---------- */
+function lg(id){return document.getElementById(id)}
+function lgShow(w){['lgMain','lgBoot','lgWait','lgNo'].forEach(x=>lg(x).style.display=x===w?'':'none');lg('login').classList.add('on')}
+async function doLogin(){const n=lg('lgName').value.trim(),p=lg('lgPass').value;lg('lgErr').textContent='';
+  if(!n||!p)return lg('lgErr').textContent='اكتب الاسم والرقم السري';
+  if(!window.FBA)return lg('lgErr').textContent=window.FBA_ERR?'تعذر الاتصال — تأكد من الإنترنت':'جاري التحميل... حاول بعد ثواني';
+  lg('lgBtn').disabled=true;
+  try{await FBA.login(await nameEmail(n),p);lg('lgPass').value='';sessionStorage.setItem('mwj_login','1')}
+  catch(e){const c=(e&&e.code)||'';lg('lgErr').textContent=/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?'الاسم أو الرقم السري غير صحيح':/too-many/.test(c)?'محاولات كثيرة — انتظر شوي وحاول':/network/.test(c)?'ما فيه اتصال بالإنترنت':'تعذر الدخول: '+(c||e.message)}
+  lg('lgBtn').disabled=false}
+function showBoot(){lgShow('lgBoot')}
+async function doBoot(){const n=lg('bName').value.replace(/\s+/g,' ').trim(),p=lg('bPass').value,p2=lg('bPass2').value;const er=lg('bErr');er.textContent='';
+  if(n.length<2)return er.textContent='اكتب اسمك';if(p.length<6)return er.textContent='الرقم السري 6 خانات على الأقل';if(p!==p2)return er.textContent='الرقمين مو متطابقين';
+  if(!window.FBA)return er.textContent='تعذر الاتصال — تأكد من الإنترنت';
+  lg('bBtn').disabled=true;
+  try{const em=await nameEmail(n);let id;
+    try{id=await FBA.signup(em,p)}catch(e){if(/email-already-in-use/.test(e.code||'')){await FBA.login(em,p);id=FBA.uid()}else throw e}
+    await FBA.commit([{op:'set',path:'users/'+id,data:{name:n,role:'admin',scope:[],leaves:[],dg:[],active:true}},{op:'set',path:'meta/boot',data:{uid:id}}]);
+    await FBA.commit([{op:'set',path:'secrets/'+id,data:{e:em,p}}]).catch(()=>{});
+    sessionStorage.setItem('mwj_login','1');lg('bPass').value=lg('bPass2').value=''}
+  catch(e){const c=(e&&e.code)||'';er.textContent=/permission/.test(c)?'فيه أدمن مسبقاً — سجّل دخول بحسابه':/weak-password/.test(c)?'الرقم السري ضعيف':/network/.test(c)?'ما فيه اتصال بالإنترنت':'تعذر: '+(c||e.message);try{if(/permission/.test(c))await FBA.logout()}catch(_){}}
+  lg('bBtn').disabled=false}
+async function logout(){ask('تسجيل خروج؟ تنمسح بيانات البرنامج من هذا الجهاز.',async()=>{try{audit('خروج')}catch(e){}
+  try{localStorage.removeItem(prefKey())}catch(e){}await new Promise(r=>setTimeout(r,400));try{await FBA.logout()}catch(e){}location.reload()})}
+function resetState(){Object.keys(SUBS).forEach(unsub);ME=null;READY=false;SY={tree:undefined,leaves:{},dets:{}};RAW={tree:undefined,leaves:{},dets:{}};LOADED=new Set();USERS=[];CONF={};document.body.dataset.role=''}
+function onAuth(u){
+  resetState();
+  if(!u){lgShow('lgMain');return}
+  lgShow('lgWait');
+  let first=true;
+  sub('me',()=>FBA.watch('users/'+u.uid,d=>{
+    if(!d||d.active!==true){lg('lgNoT').textContent=!d?'هذا الحساب ما له صلاحية بعد — كلّم الأدمن':'تم إيقاف هذا الحساب — كلّم الأدمن';lgShow('lgNo');Object.keys(SUBS).filter(k=>k!=='me').forEach(unsub);READY=false;ME=null;return}
+    const prev=ME;ME=Object.assign({uid:u.uid},d);
+    if(prev&&(prev.role!==ME.role||canon(prev.leaves)!==canon(ME.leaves)||canon(prev.dg)!==canon(ME.dg)||canon(prev.scope)!==canon(ME.scope))){if(!isAdm()||prev.role!==ME.role){location.reload();return}}
+    document.body.dataset.role=ME.role;
+    sub('tree',()=>FBA.watch('meta/tree',x=>gotSnap('tree',null,x||null),e=>{SY.tree=null;schedule()}));
+    sub('conf',()=>FBA.watch('meta/conf',x=>{CONF=x||{};if(CONF.api)try{localStorage.setItem('mawajeed_api',CONF.api)}catch(e){};if(READY)renderAcc()},()=>{}));
+    if(isAdm())sub('users',()=>FBA.watchColl('users',arr=>{USERS=arr;if(READY)renderAcc()},()=>{}));else unsub('users');
+    syncSubs();
+    if(first){first=false;if(sessionStorage.getItem('mwj_login')){sessionStorage.removeItem('mwj_login');setTimeout(()=>audit('دخول'),2500)}}
+  },e=>{lg('lgNoT').textContent='تعذر قراءة الحساب: '+errMsg(e);lgShow('lgNo')}));
+}
+function showApp(){lg('login').classList.remove('on');
+  buildS();
+  if(S.pin&&!BOOTED)document.getElementById('lock').classList.add('on');
+  BOOTED=true;renderAll();renderAcc();
+  if(isAdm()&&(!SY.tree||!(SY.tree.batches||[]).length))setTimeout(openMigrate,300)}
+
+/* ---------- أول تشغيل للأدمن: نقل البيانات للسحابة ---------- */
+function localData(){try{const d=JSON.parse(localStorage.getItem(KEY));return d&&d.batches?d:null}catch(e){return null}}
+function openMigrate(){const d=localData(),n=d?d.batches.reduce((a,b)=>a+cntSt(b),0):0;
+  form('☁️ السيرفر فاضي',`<p class="small" style="text-align:right;line-height:1.9">هذا أول دخول للأدمن. وش تبي تحط في السيرفر؟</p>
+    ${d?`<button class="btn full" style="margin-bottom:8px" onclick="closeConfirm();migrate('local')">⬆️ رفع البيانات الموجودة في هذا الجهاز (${n} طالب)</button>`:''}
+    <button class="btn sec full" style="margin-bottom:8px" onclick="closeConfirm();go('settings');document.getElementById('impFile').click()">📂 استيراد من ملف نسخة احتياطية</button>
+    <button class="btn sec full" onclick="closeConfirm();migrate('default')">بدء بالهيكل الافتراضي (فاضي)</button>`,()=>{},'إغلاق')}
+function migrate(how){
+  if(how==='local'){const d=localData();if(!d)return;const pr=loadPrefs();S=Object.assign(d,pr,{scope:'all'});delete S.pin}
+  else{S=Object.assign({v:2,batches:[mkBatch('دفعة المستجدين الأغرار','65',3,4,'ح.و.ت.د'),mkBatch('دفعة الرقباء الأوائل المستجدين','',0,0,'ط.ض.ص')],dets:[]},loadPrefs());delete S.groups}
+  load();save();renderAll();toast('☁️ تم الرفع للسيرفر ✓')}
+
+/* ---------- واجهة الاعتماد في «الموجود» ---------- */
+function apBtn(t,fn,cls){return `<button class="btn ${cls||''}" style="flex:1;padding:10px 8px" onclick="${fn}">${t}</button>`}
+function apLines(d){const a=[];if(!d)return '';
+  if(d.sub)a.push(`أرسله: ${esc(d.sub.n)} · ${tf(d.sub.t)}`);
+  Object.keys(d.ap||{}).forEach(k=>{const v=d.ap[k];a.push(`${v.e?'عدّله واعتمده':'اعتمده'} ${LVN[k]||''}: ${esc(v.n)} · ${tf(v.t)}`)});
+  if(d.by)a.push(`آخر إدخال: ${esc(d.by.n)} · ${tf(d.by.t)}`);
+  return a.length?`<div class="small" style="line-height:1.8;margin-top:6px">${a.join('<br>')}</div>`:''}
+function renderAp(){
+  const c=document.getElementById('apCard');if(!c)return;
+  const pi=document.getElementById('sPresent'),n=scopeN();
+  if(!ME||!READY){c.style.display='none';return}
+  const leaf=isLeaf(n);
+  if(leaf){const lk=!canEdit()||!!lockMsg(n);pi.disabled=lk;document.getElementById('pUp').disabled=lk;document.getElementById('pDn').disabled=lk}
+  const ls=leaves(n).filter(l=>l.students.length);
+  if(!ls.length){c.style.display='none';return}
+  c.style.display='';
+  if(leaf){const s=stInfo(n),d=n.days[curDate];let b=[];
+    if(ME.role==='tr'){if(['none','draft','rej'].includes(s.k))b.push(apBtn('📤 إرسال للاعتماد',`apSubmit('${n.id}')`));
+      if(s.k==='sub'&&!Object.keys((d&&d.ap)||{}).length)b.push(apBtn('↩️ سحب للتعديل',`apWithdraw('${n.id}')`,'sec'))}
+    if(canApprove(n))b.push(apBtn('✅ اعتماد',`apApprove('${n.id}')`));
+    if(canReject(n))b.push(apBtn('↩️ رفض',`apReject('${n.id}')`,'dng'));
+    c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>حالة الاعتماد</b><span class="apb ${s.k}">${esc(s.t)}</span></div>${apLines(d)}${b.length?`<div class="row" style="margin-top:10px">${b.join('')}</div>`:''}`;
+    return}
+  const cnt={};ls.forEach(l=>{const k=stInfo(l).k;cnt[k]=(cnt[k]||0)+1});
+  const can=ls.filter(canApprove).length;
+  c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>حالة الاعتماد</b><span class="small">معتمد ${cnt.ok||0} من ${ls.length}</span></div>
+    <ul class="list" style="margin-top:6px">${ls.map(l=>{const s=stInfo(l);return `<li onclick="setScope('${l.id}')"><span class="nm">${esc(relLabel(l,n)||label(l))}<span class="unit">${s.k==='ok'||s.k==='sub'?esc(((l.days[curDate]||{}).sub||(l.days[curDate]||{}).by||{}).n||''):''}</span></span><span class="apb ${s.k}">${esc(s.t)}</span>${canApprove(l)?`<button class="tb" onclick="event.stopPropagation();apApprove('${l.id}')">✅</button>`:''}</li>`}).join('')}</ul>
+    ${can>1?`<button class="btn full" style="margin-top:10px" onclick="apApproveAll()">✅ اعتماد الكل (${can})</button>`:''}`}
+
+/* ---------- حسابي + إدارة الحسابات (الأدمن) ---------- */
+function apiUrl(){return CONF.api||localStorage.getItem('mawajeed_api')||''}
+async function api(action,body){const url=apiUrl();if(!url)throw new Error('حط رابط السيرفر أول');const tok=await FBA.token();
+  let r;try{r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify(Object.assign({action},body))})}catch(e){throw new Error('ما فيه اتصال بالسيرفر')}
+  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw new Error(j.error||('HTTP '+r.status));return j}
+function scopeName(id){if(id==='ALL')return 'كل الدورات';return IDX[id]?fullLabel(N(id)):'(محذوف)'}
+function userScopeTxt(u){if(u.role==='admin')return 'كل شيء';const s=u.scope||[];return s.length?s.map(scopeName).join('، '):'بدون وحدة'}
+function renderAcc(){
+  const me=document.getElementById('meInfo');if(me&&ME)me.innerHTML=`<b>${esc(ME.name)}</b><br><span class="small">${ROLES[ME.role]||ME.role} — ${esc(userScopeTxt(ME))}</span>`;
+  if(!isAdm())return;
+  const ui=document.getElementById('apiIn');if(ui&&document.activeElement!==ui)ui.value=apiUrl();
+  const ul=document.getElementById('usrList');if(!ul)return;
+  const arr=[...USERS].sort((a,b)=>(ROLE_ORDER.indexOf(a.role)-ROLE_ORDER.indexOf(b.role))||String(a.name).localeCompare(b.name,'ar'));
+  ul.innerHTML=arr.length?arr.map(u=>`<li onclick="openUser('${u.id}')" style="${u.active?'':'opacity:.5'}"><span class="nm"><b>${esc(u.name)}</b>${u.id===ME.uid?' (أنت)':''}<span class="unit">${ROLES[u.role]||u.role} — ${esc(userScopeTxt(u))}</span></span>${u.active?'':'<span class="badge no">موقوف</span>'}</li>`).join(''):'<div class="empty">لا توجد حسابات</div>';
+}
+function saveApi(){const v=document.getElementById('apiIn').value.trim();if(!/^https:\/\//.test(v))return toast('الرابط لازم يبدأ بـ https://');
+  localStorage.setItem('mawajeed_api',v);FBA.commit([{op:'set',path:'meta/conf',data:Object.assign({},CONF,{api:v})}]).catch(e=>toast(errMsg(e)));
+  fetch(v,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ping'})}).then(r=>r.json()).then(j=>toast(j.ok?'✅ السيرفر شغال':'رد غير متوقع')).catch(()=>toast('⚠️ ما قدرت أوصل للسيرفر — تأكد من الرابط'))}
+// الوحدات المتاحة لكل صلاحية
+function scopeChoices(role){const all=[];const w=(n,d)=>{all.push({n,d});n.children.forEach(c=>w(c,d+1))};S.batches.forEach(b=>w(b,1));
+  if(role==='tr')return S.batches.flatMap(leaves).map(l=>({id:l.id,t:fullLabel(l)}));
+  if(role==='co')return all.filter(x=>x.d===2&&x.n.children.length).map(x=>({id:x.n.id,t:fullLabel(x.n)}));
+  if(role==='gr')return (S.groups||[]).map(g=>({id:g.id,t:'⭐ '+g.name}));
+  if(role==='ba')return S.batches.map(b=>({id:b.id,t:label(b)}));
+  if(role==='view')return [{id:'ALL',t:'📋 كل الدورات'},...(S.groups||[]).map(g=>({id:g.id,t:'⭐ '+g.name})),...S.batches.map(b=>({id:b.id,t:label(b)}))];
+  return []}
+function userCalc(role,scope){if(role==='admin')return {leaves:[],dg:[]};
+  const ids=scope.includes('ALL')?S.batches.map(b=>b.id):scope.filter(id=>IDX[id]);
+  const lv=[...new Set(ids.flatMap(id=>leaves(N(id)).map(l=>l.id)))];let dg=[];
+  if(role==='ba'){dg=[...ids];(S.groups||[]).forEach(g=>{if(g.members.some(m=>IDX[m]&&ids.includes(chain(N(m))[0].id)))dg.push(g.id)})}
+  else if(role==='gr')dg=[...ids];
+  return {leaves:lv,dg}}
+function refreshUserScopes(){if(!isAdm())return;const ops=[];USERS.forEach(u=>{if(u.role==='admin')return;const x=userCalc(u.role,u.scope||[]);
+  if(canon(x.leaves)!==canon(u.leaves||[])||canon(x.dg)!==canon(u.dg||[]))ops.push({op:'upd',path:'users/'+u.id,pairs:[[['leaves'],x.leaves],[['dg'],x.dg]]})});
+  if(ops.length)FBA.commit(ops).catch(e=>toast('تعذر تحديث صلاحيات الحسابات: '+errMsg(e)))}
+let UED=null;
+function openUser(id){const u=id?USERS.find(x=>x.id===id):null;UED={id:id||null,name:u?u.name:'',role:u?u.role:'tr',scope:u?[...(u.scope||[])]:[],active:u?u.active!==false:true};drawUser();document.getElementById('uSheet').classList.add('on')}
+function closeUser(){document.getElementById('uSheet').classList.remove('on')}
+function uSet(k,v){UED[k]=v;if(k==='role')UED.scope=[];drawUser()}
+function uTog(id,on){const s=new Set(UED.scope);if(on)s.add(id);else s.delete(id);if(id==='ALL'&&on)s.clear(),s.add('ALL');else if(on)s.delete('ALL');UED.scope=[...s];drawUser()}
+function drawUser(){const U=UED,ex=!!U.id,self=ex&&U.id===ME.uid;
+  document.getElementById('uTitle').textContent=ex?'تعديل حساب':'حساب جديد';
+  const multi=U.role==='view'||U.role==='tr',ch=scopeChoices(U.role);
+  let h=`<label class="l" style="margin-top:0">الاسم بالعربي (يدخل فيه)</label><input id="uName" type="text" value="${esc(U.name)}" placeholder="مثال: محمد العنزي" oninput="UED.name=this.value">
+  ${ex?`<div class="small" style="margin-top:10px">الرقم السري الحالي: <b id="uCur" dir="ltr">••••••</b> <button class="tb" onclick="showPass()">عرض</button></div>`:''}<label class="l">${ex?'رقم سري جديد (اتركه فاضي إذا ما تبي تغيّره)':'الرقم السري (6 خانات على الأقل)'}</label><input id="uPass" type="text" autocomplete="off" value="${esc(U.pass||'')}" oninput="UED.pass=this.value" placeholder="${ex?'بدون تغيير':'مثال: 482915'}">
+  <label class="l">الصلاحية</label><select ${self?'disabled':''} onchange="uSet('role',this.value)">${ROLE_ORDER.map(r=>`<option value="${r}" ${r===U.role?'selected':''}>${ROLES[r]}</option>`).join('')}</select>
+  <p class="small" style="margin:6px 0 0">${({admin:'كل الصلاحيات: الطلبة والحسابات والهيكل.',ba:'يشوف ويعدّل ويعتمد كل الدفعة، وكشوف المحجوزين.',gr:'يشوف ويعدّل ويعتمد الدورة (مثل الصمود)، وكشوف المحجوزين.',co:'يشوف ويعدّل ويعتمد سريته.',tr:'يدخل موجود فصيله ويرسله للاعتماد.',view:'يشوف العام والحالي والمتفرقة وينسخ ويصدّر PDF بس — ما يعدّل شي.'})[U.role]}</p>`;
+  if(U.role!=='admin'){h+=`<label class="l">${({tr:'الفصيل',co:'السرية',gr:'الدورة',ba:'الدفعة',view:'يشوف'})[U.role]}${multi?' (تقدر تختار أكثر من وحدة)':''}</label>`;
+    h+=ch.length?`<div class="card" style="margin:0;padding:6px 12px;max-height:240px;overflow:auto">${ch.map(o=>`<label class="chk" style="margin:6px 0"><input type="${multi?'checkbox':'radio'}" name="uSc" ${U.scope.includes(o.id)?'checked':''} onchange="${multi?`uTog('${o.id}',this.checked)`:`UED.scope=['${o.id}'];drawUser()`}"> ${esc(o.t)}</label>`).join('')}</div>`:`<p class="note bad">${U.role==='gr'?'أنشئ المجموعات (الصمود/التحرير) من الإعدادات أول':'لا توجد وحدات'}</p>`}
+  h+=`<button class="btn full" style="margin-top:14px" id="uSave" onclick="saveUser()">${ex?'حفظ التعديل':'إنشاء الحساب'}</button>`;
+  if(ex&&!self)h+=`<div class="row" style="margin-top:8px"><button class="btn sec" onclick="toggleUser()">${U.active?'⏸️ إيقاف الحساب':'▶️ تفعيل الحساب'}</button><button class="btn dng" onclick="delUser()">🗑️ حذف</button></div>`;
+  h+=`<p class="note" id="uErr"></p><div style="height:8px"></div>`;
+  document.getElementById('uBody').innerHTML=h}
+async function uRun(fn,ok){const b=document.getElementById('uSave'),e=document.getElementById('uErr');if(b)b.disabled=true;e.className='note';e.textContent='جاري الحفظ...';
+  try{await fn();closeUser();toast(ok)}catch(x){e.className='note bad';e.textContent=accErr(x)}if(b)b.disabled=false}
+function accErr(x){const c=(x&&x.code)||'';if(/email-already-in-use/.test(c))return 'هذا الاسم مستخدم لحساب ثاني';if(/weak-password/.test(c))return 'الرقم السري ضعيف — 6 خانات على الأقل';if(/permission/.test(c))return 'ما عندك صلاحية';if(/network/.test(c))return 'ما فيه اتصال بالإنترنت';if(/invalid-credential|wrong-password|user-not-found/.test(c))return 'الرقم السري المحفوظ لهذا الحساب ما يطابق — احذف الحساب وسوّه من جديد';return (x&&x.message)||String(x)}
+const useApi=()=>!!apiUrl();
+async function accCreate(b){if(useApi())return api('create',b);
+  const em=await nameEmail(b.name),id=await FBA.subCreate(em,b.pass);
+  await FBA.commit([{op:'set',path:'users/'+id,data:{name:b.name,role:b.role,scope:b.scope,leaves:b.leaves,dg:b.dg,active:true,by:ME.name,t:nowT()}},{op:'set',path:'secrets/'+id,data:{e:em,p:b.pass}}])}
+async function accUpdate(id,b){if(useApi())return api('update',Object.assign({uid:id},b));
+  const u=USERS.find(x=>x.id===id),sec=await FBA.get('secrets/'+id);
+  const doc={};['role','scope','leaves','dg','active'].forEach(k=>{if(b[k]!==undefined)doc[k]=b[k]});
+  if(b.name!==undefined&&nameKey(b.name)!==nameKey(u.name)){ // تغيير الاسم = حساب دخول جديد بنفس البيانات
+    if(!sec)throw new Error('ما يمكن تغيير الاسم لهذا الحساب — احذفه وسوّه من جديد');
+    if(id===ME.uid)throw new Error('ما تقدر تغيّر اسم حسابك وأنت داخل فيه');
+    const em=await nameEmail(b.name),np=b.pass||sec.p,nid=await FBA.subCreate(em,np);
+    const nd=Object.assign({},u,doc,{name:b.name});delete nd.id;
+    await FBA.commit([{op:'set',path:'users/'+nid,data:nd},{op:'set',path:'secrets/'+nid,data:{e:em,p:np}},{op:'del',path:'users/'+id},{op:'del',path:'secrets/'+id}]);
+    try{await FBA.subDelete(sec.e,sec.p)}catch(e){}return}
+  if(b.name!==undefined)doc.name=b.name;
+  if(b.pass){if(!sec)throw new Error('ما يمكن تغيير الرقم لهذا الحساب — احذفه وسوّه من جديد');await FBA.subSetPass(sec.e,sec.p,b.pass);await FBA.commit([{op:'set',path:'secrets/'+id,data:{e:sec.e,p:b.pass}}])}
+  if(Object.keys(doc).length)await FBA.commit([{op:'upd',path:'users/'+id,pairs:Object.keys(doc).map(k=>[[k],doc[k]])}])}
+async function accDelete(id){if(useApi())return api('delete',{uid:id});const sec=await FBA.get('secrets/'+id);
+  if(sec)try{await FBA.subDelete(sec.e,sec.p)}catch(e){}
+  await FBA.commit([{op:'del',path:'users/'+id},{op:'del',path:'secrets/'+id}])}
+async function showPass(){const e=document.getElementById('uCur');e.textContent='...';try{const s=await FBA.get('secrets/'+UED.id);e.textContent=s?s.p:'غير محفوظ'}catch(x){e.textContent=accErr(x)}}
+function saveUser(){const U=UED,name=document.getElementById('uName').value.replace(/\s+/g,' ').trim(),pass=document.getElementById('uPass').value.trim();
+  const e=document.getElementById('uErr');e.className='note bad';
+  if(name.length<2)return e.textContent='اكتب الاسم';
+  if(!U.id&&pass.length<6)return e.textContent='الرقم السري 6 خانات على الأقل';if(pass&&pass.length<6)return e.textContent='الرقم السري 6 خانات على الأقل';
+  if(U.role!=='admin'&&!U.scope.length)return e.textContent='اختر الوحدة';
+  const dup=USERS.find(x=>x.id!==U.id&&nameKey(x.name)===nameKey(name));if(dup)return e.textContent='فيه حساب بنفس الاسم — ميّزه (مثلاً أضف اسم الأب)';
+  const x=userCalc(U.role,U.scope),body={name,role:U.role,scope:U.scope,leaves:x.leaves,dg:x.dg};if(pass)body.pass=pass;
+  uRun(()=>U.id?accUpdate(U.id,body):accCreate(body),U.id?'✓ تم حفظ الحساب'+(pass?' والرقم السري الجديد':''):`✓ تم إنشاء حساب ${name}`)}
+function toggleUser(){const U=UED;ask(U.active?`إيقاف حساب ${U.name}؟ ما يقدر يدخل لين تفعّله.`:`تفعيل حساب ${U.name}؟`,()=>uRun(()=>accUpdate(U.id,{active:!U.active}),U.active?'تم الإيقاف':'تم التفعيل'))}
+function delUser(){const U=UED;ask(`حذف حساب ${U.name} نهائياً؟`,()=>uRun(()=>accDelete(U.id),'تم حذف الحساب'))}
+async function loadAudit(){const ul=document.getElementById('audList');ul.innerHTML='<div class="empty">جاري التحميل...</div>';
+  try{AUDIT=await FBA.recent('audit','t',150);ul.innerHTML=AUDIT.length?AUDIT.map(a=>`<li style="cursor:default"><span class="nm"><b>${esc(a.n||'')}</b> — ${esc(a.a||'')}${a.u?`<span class="unit">${esc(a.u)}${a.d&&a.d!==today()?' · '+dm(a.d):''}</span>`:''}${a.x?`<span class="unit">${esc(a.x)}</span>`:''}</span><span class="small">${tf(a.t)}</span></li>`).join(''):'<div class="empty">لا يوجد</div>'}
+  catch(e){ul.innerHTML=`<div class="empty">${esc(errMsg(e))}</div>`}}
+
+/* ---------- قيود الواجهة حسب الصلاحية ---------- */
+{const _o=openSheet;openSheet=function(lid,reg){if(!canEdit())return;const m=lockMsg(N(lid));if(m)return toast(m);_o(lid,reg)}}
+{const _f=openFab;openFab=function(){if(!canEdit())return;_f()}}
+{const _m=openMsg;openMsg=function(){if(!canEdit())return;_m()}}
+{const _p=setPresent;setPresent=function(v){const n=scopeN();if(isLeaf(n)&&(!canEdit()||lockMsg(n))){toast(lockMsg(n)||'مشاهدة فقط');return renderToday()}_p(v)}}
+{const _b=bumpPresent;bumpPresent=function(x){const n=scopeN();if(isLeaf(n)&&(!canEdit()||lockMsg(n)))return toast(lockMsg(n)||'مشاهدة فقط');_b(x)}}
+{const _r=renderToday;renderToday=function(){_r();try{renderAp()}catch(e){console.error(e)}}}
+{const _s=renderSettings;renderSettings=function(){_s();try{renderAcc();const rb=document.getElementById('restoreBtn');if(rb)rb.style.display='none'}catch(e){}}}
+{const _g=go;go=function(v){if(ME&&((v==='det'&&!canDet())||(['kashf','students'].includes(v)&&!canEdit())))v='today';_g(v)}}
+
 /* ---------- تشغيل ---------- */
-load();
 versionCheck();
-if(S.pin)document.getElementById('lock').classList.add('on');
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderDue();if(document.hidden&&S.pin)document.getElementById('lock').classList.add('on')});
-renderAll();
+S={v:2,batches:[],groups:[],dets:[],scope:'all'};reindex();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&READY)renderDue();if(document.hidden&&S&&S.pin&&READY)document.getElementById('lock').classList.add('on')});
+['lgName','lgPass'].forEach(id=>lg(id).addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()}));
+function fbaReady(){if(!window.FBA){lg('lgErr').textContent='تعذر تحميل البرنامج — تأكد من الإنترنت وافتحه من جديد';lgShow('lgMain');return}DEL=FBA.DEL;FBA.onAuth(onAuth)}
+lgShow('lgWait');
+if(window.FBA||window.FBA_ERR)fbaReady();else window.addEventListener('fba',fbaReady,{once:true});
+
 </script>
 </body>
 </html>
