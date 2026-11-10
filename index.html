@@ -156,6 +156,7 @@ nav button{font-size:11px}
 <!-- ======= الموجود ======= -->
 <section class="view on" id="v-today">
   <button class="btn sec full" style="margin-bottom:12px" onclick="openMsg()">📩 تحديث الموجود من رسالة</button>
+  <div class="card" id="errBar" style="display:none;background:#fdecea;border-color:#f0b9b1;color:#8e1f18;font-size:14px;cursor:pointer;padding:12px 14px" onclick="openErr()"></div>
   <div class="card" id="dueBar" style="display:none;background:#fff4e0;border-color:#f0d39a;color:#7a5410;font-size:14px;cursor:pointer;padding:12px 14px" onclick="openDue()"></div>
   <div class="stats">
     <div class="stat"><span>العام</span><b id="sTotal">0</b></div>
@@ -456,6 +457,14 @@ nav button{font-size:11px}
     <button class="btn sec full" style="margin-top:12px" onclick="closeFab()">إغلاق</button>
   </div>
 </div>
+<div class="sheet-bg" id="errSheet" onclick="if(event.target===this)closeErr()">
+  <div class="sheet">
+    <h3>⚠️ أخطاء في الأرقام</h3>
+    <div class="sub" id="errSub"></div>
+    <ul class="list" id="errList"></ul>
+    <button class="btn sec full" style="margin-top:12px" onclick="closeErr()">إغلاق</button>
+  </div>
+</div>
 <div class="sheet-bg" id="dueSheet" onclick="if(event.target===this)closeDue()">
   <div class="sheet">
     <h3>⏰ انتهت المدة</h3>
@@ -495,7 +504,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='1.18.2';
+const APP_VERSION='1.19.0';
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -592,7 +601,7 @@ function renderAll(){
   reindex();
   ['scopeSel','scopeSel2'].forEach(id=>{const e=document.getElementById(id);e.innerHTML=scopeOptions(S.scope);e.value=S.scope});
   document.getElementById('dateIn').value=curDate;
-  renderToday();renderReport();renderStudents();renderSettings();renderDet();renderKashf();renderDue();
+  renderToday();renderReport();renderStudents();renderSettings();renderDet();renderKashf();renderDue();renderErr();
 }
 function renderToday(){
   const n=scopeN(),k=calc(n),leaf=isLeaf(n);
@@ -617,7 +626,7 @@ function renderToday(){
   const kc=document.getElementById('kidsCard');
   if(leaf||!n.children.length){kc.style.display='none'}
   else{kc.style.display='';document.getElementById('kidsTitle').textContent='التوزيع';
-    document.getElementById('kidsList').innerHTML=n.children.map(c=>{const q=calc(c);const st=!q.total?'':q.pending?`<span class="badge no">لم يُدخل ${isLeaf(c)?'':q.pending}</span>`:'<span class="badge ok">✓</span>';
+    const EE=errList();document.getElementById('kidsList').innerHTML=n.children.map(c=>{const q=calc(c),ce=errIn(c,EE).length;const st=ce?`<span class="badge" style="background:#fdecea;color:#8e1f18">⚠️ ${isLeaf(c)?'خطأ':ce}</span>`:!q.total?'':q.pending?`<span class="badge no">لم يُدخل ${isLeaf(c)?'':q.pending}</span>`:'<span class="badge ok">✓</span>';
       return `<li onclick="setScope('${c.id}')"><span class="kn">${esc(label(c))}</span><span class="kv">ع ${q.total} · ح ${q.present} · م ${q.absent}</span>${st}</li>`}).join('')}
   renderList();
 }
@@ -691,8 +700,8 @@ function setFilter(f){filter=f;document.getElementById('fAll').classList.toggle(
 // إذا تغيّرت حالة طالب (متفرقة/عودة) يتعدّل «الحالي» المكتوب يدوياً في كل يوم تأثر
 function absSnap(l,s){return Object.keys(l.days).filter(d=>hasPresent(l.days[d])).map(d=>[d,!!eff(l,s,d)])}
 function fixPresent(l,s,snap){let ch=0;snap.forEach(([d,b])=>{const a=!!eff(l,s,d),x=l.days[d];if(x&&hasPresent(x)&&a!==b){x.present=Math.max(0,Math.min(l.students.length,Number(x.present)+(b?1:-1)));ch++}});return ch}
-function bumpPresent(delta){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n),k=calc(n);const base=hasPresent(d)?Number(d.present):k.present;d.present=Math.max(0,Math.min(k.total,base+delta));save();renderToday()}
-function setPresent(v){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n);d.present=v===''?null:Math.max(0,parseInt(digits(v))||0);save();renderToday()}
+function bumpPresent(delta){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n),k=calc(n);const base=hasPresent(d)?Number(d.present):k.present;d.present=Math.max(0,Math.min(k.total,base+delta));save();renderToday();renderErr()}
+function setPresent(v){const n=scopeN();if(!isLeaf(n))return;const d=dayMk(n);d.present=v===''?null:Math.max(0,parseInt(digits(v))||0);save();renderErr();renderToday()}
 let shL=null,shR=null;
 let shSel=null;
 function openSheet(lid,reg){
@@ -753,6 +762,23 @@ function extendFx(){const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(
   save();closeSheet();renderAll();renderDue();toast(`⏩ تمديد ${daysTxt(n)} — العودة ${dm(a.due)}`)}
 // تنبيهات انتهاء المدة: كل حالة لها تاريخ عودة متوقع وصل ولم تُسجل عودة
 function dueList(){const t=today(),out=[];S.batches.forEach(b=>leaves(b).forEach(l=>l.students.forEach(st=>{const a=(st.fx||[]).find(e=>!e.end&&e.due);if(a&&a.due<=t)out.push({l,s:st,a})})));return out.sort((x,y)=>x.a.due.localeCompare(y.a.due))}
+// فحص الأرقام: في كل فصيل (اللي انكتب حاليه) لازم الحالي + المتفرقة المسجلة = العام
+function errList(date=curDate){const out=[];S.batches.forEach(b=>leaves(b).forEach(l=>{const d=l.days[date];if(!d||!hasPresent(d))return;
+  const k=calc(l,date),t=k.total,p=Number(d.present),m=k.marked;if(p+m!==t)out.push({l,t,p,m,diff:p+m-t})}));return out}
+function errIn(n,E){const ids=new Set(leaves(n).map(x=>x.id));return E.filter(e=>ids.has(e.l.id))}
+function renderErr(){const E=errList(),bar=document.getElementById('errBar');
+  bar.style.display=E.length?'':'none';
+  if(E.length){const inS=errIn(scopeN(),E).length;bar.innerHTML=`⚠️ <b>خطأ في الأرقام</b> في ${E.length===1?'فصيل واحد':E.length===2?'فصيلين':E.length+' فصائل'} — الحالي + المتفرقة لا يساوي العام${inS!==E.length?` (${inS} منها في المستوى المختار)`:''}<br><span style="font-size:13px">${E.slice(0,3).map(e=>esc(fullLabel(e.l))).join('<br>')}${E.length>3?'<br>…':''}</span><div style="font-size:12px;margin-top:4px">اضغط للتفاصيل والتصحيح</div>`}
+  if(document.getElementById('errSheet').classList.contains('on'))drawErr(E)}
+function drawErr(E=errList()){document.getElementById('errSub').textContent=`${fmtDate(curDate)} — ${E.length?E.length+' خطأ':'ما فيه أخطاء ✓'}`;
+  document.getElementById('errList').innerHTML=E.length?E.map((e,i)=>{const fix=e.t-e.m;return `<li style="display:block;cursor:default">
+    <b>${esc(fullLabel(e.l))}</b>
+    <div class="small" style="margin:4px 0;line-height:1.8">العام <b>${e.t}</b> · الحالي المكتوب <b>${e.p}</b> · المتفرقة المسجلة <b>${e.m}</b><br>
+    <span style="color:var(--warn)">${e.diff>0?`الحالي + المتفرقة = ${e.p+e.m} — <b>زايد ${e.diff}</b> عن العام (الحالي كثير، أو فيه متفرقة زيادة)`:`الحالي + المتفرقة = ${e.p+e.m} — <b>ناقص ${-e.diff}</b> عن العام (فيه ${-e.diff} متفرقة ما انسجل سببهم، أو الحالي قليل)`}</span></div>
+    <div class="row"><button class="btn sec" style="padding:9px" onclick="closeErr();setScope('${e.l.id}');go('today')">عرض الفصيل</button><button class="btn" style="padding:9px" onclick="fixErr(${i})">اجعل الحالي ${fix}</button></div></li>`}).join(''):'<div class="empty">كل الأرقام مطابقة ✓</div>'}
+function openErr(){document.getElementById('errSheet').classList.add('on');drawErr()}
+function closeErr(){document.getElementById('errSheet').classList.remove('on')}
+function fixErr(i){const e=errList()[i];if(!e)return;e.l.days[curDate].present=Math.max(0,e.t-e.m);save();renderAll();drawErr();toast(`تم: الحالي ${e.t-e.m} في ${e.l.name}`)}
 function renderDue(){const L=dueList(),bar=document.getElementById('dueBar'),fab=document.getElementById('fab');
   bar.style.display=L.length?'':'none';bar.innerHTML=`⏰ <b>${L.length}</b> ${L.length===1?'طالب انتهت مدته':L.length===2?'طالبين انتهت مدتهم':'طلاب انتهت مدتهم'} — اضغط للتمديد أو العودة`;
   fab.dataset.badge=L.length||'';
