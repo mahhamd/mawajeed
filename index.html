@@ -147,6 +147,9 @@ body:not([data-role=admin]):not([data-role=ba]):not([data-role=gr]) .dt{display:
 body:not([data-role=admin]) #allList .del{display:none}
 body[data-role=view] #dueBar,body[data-role=view] #errBar{display:none!important}
 .btn:disabled,.stat input:disabled{opacity:.5}
+#apCard .list li .nm{white-space:normal;overflow-wrap:anywhere}
+#apCard .apb{flex:0 0 auto}
+#specRange>div{flex:1 1 0;min-width:0}#specRange input{width:100%;min-width:0;box-sizing:border-box}
 details summary{cursor:pointer}
 </style>
 </head>
@@ -613,7 +616,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='2.0.0';const ONLINE=true;
+const APP_VERSION='2.0.2';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -2008,10 +2011,13 @@ function renderAp(){
     if(canReject(n))b.push(apBtn('↩️ رفض',`apReject('${n.id}')`,'dng'));
     c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>حالة الاعتماد</b><span class="apb ${s.k}">${esc(s.t)}</span></div>${apLines(d)}${b.length?`<div class="row" style="margin-top:10px">${b.join('')}</div>`:''}`;
     return}
+  const SH={none:'لم يُدخل',draft:'✏️ لم يُرسل',rej:'↩️ مرفوض',ok:'✅ معتمد'};
+  const shortSt=st=>st.k==='sub'?'⏳ عند '+LVN[st.next]:SH[st.k];
+  const nm=l=>n===ROOT||n.virtual?chain(l).slice(n===ROOT?0:1).map(x=>IDX[x.id].d===1?shortName(x):label(x)).join(' / '):relLabel(l,n)||label(l);
   const cnt={};ls.forEach(l=>{const k=stInfo(l).k;cnt[k]=(cnt[k]||0)+1});
   const can=ls.filter(canApprove).length;
   c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>حالة الاعتماد</b><span class="small">معتمد ${cnt.ok||0} من ${ls.length}</span></div>
-    <ul class="list" style="margin-top:6px">${ls.map(l=>{const s=stInfo(l);return `<li onclick="setScope('${l.id}')"><span class="nm">${esc(relLabel(l,n)||label(l))}<span class="unit">${s.k==='ok'||s.k==='sub'?esc(((l.days[curDate]||{}).sub||(l.days[curDate]||{}).by||{}).n||''):''}</span></span><span class="apb ${s.k}">${esc(s.t)}</span>${canApprove(l)?`<button class="tb" onclick="event.stopPropagation();apApprove('${l.id}')">✅</button>`:''}</li>`}).join('')}</ul>
+    <ul class="list" style="margin-top:6px">${ls.map(l=>{const s=stInfo(l);return `<li onclick="setScope('${l.id}')"><span class="nm" style="min-width:0">${esc(nm(l))}<span class="unit">${s.k==='rej'?esc(s.t):s.k==='ok'||s.k==='sub'?esc(((l.days[curDate]||{}).sub||(l.days[curDate]||{}).by||{}).n||''):''}</span></span><span class="apb ${s.k}">${esc(shortSt(s))}</span>${canApprove(l)?`<button class="tb" onclick="event.stopPropagation();apApprove('${l.id}')">✅</button>`:''}</li>`}).join('')}</ul>
     ${can>1?`<button class="btn full" style="margin-top:10px" onclick="apApproveAll()">✅ اعتماد الكل (${can})</button>`:''}`}
 
 /* ---------- حسابي + إدارة الحسابات (الأدمن) ---------- */

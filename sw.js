@@ -1,5 +1,5 @@
 // غيّر رقم النسخة هنا مع كل تحديث (لازم يطابق APP_VERSION في index.html)
-const VERSION = '2.0.0';
+const VERSION = '2.0.2';
 const CACHE = 'mawajeed-' + VERSION;
 const FB_CACHE = 'mawajeed-fb-13.2.0';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
