@@ -149,7 +149,8 @@ body[data-role=view] #dueBar,body[data-role=view] #errBar{display:none!important
 .btn:disabled,.stat input:disabled{opacity:.5}
 #apCard .list li .nm{white-space:normal;overflow-wrap:anywhere}
 #apCard .apb{flex:0 0 auto}
-#specRange>div{flex:1 1 0;min-width:0}#specRange input{width:100%;min-width:0;box-sizing:border-box}
+#specRange>div{flex:1 1 0;min-width:0}
+#fmList li.muted{opacity:.6}#specRange input{width:100%;min-width:0;box-sizing:border-box}
 details summary{cursor:pointer}
 </style>
 </head>
@@ -333,6 +334,22 @@ details summary{cursor:pointer}
 </section>
 
 <!-- ======= الإعدادات ======= -->
+<section class="view" id="v-fxm">
+  <div class="card">
+    <b>🗂 إدارة المتفرقة</b>
+    <p class="small">كل المتفرقة من بداية الدورات. اضغط على أي سطر عشان تعدّل نوعها أو تاريخها أو سببها أو تحذفها. وابحث عن أي طالب عشان تضيف له متفرقة (أكثر من وحدة بتواريخها).</p>
+    <select id="fmScope" onchange="FM.scope=this.value;renderFm()"></select>
+    <div class="row" style="margin-top:8px"><div style="flex:1;min-width:0"><label class="l" style="margin-top:0">من</label><input id="fmFrom" type="date" style="width:100%;min-width:0" onchange="FM.from=this.value;renderFm()"></div><div style="flex:1;min-width:0"><label class="l" style="margin-top:0">إلى</label><input id="fmTo" type="date" style="width:100%;min-width:0" onchange="FM.to=this.value;renderFm()"></div></div>
+    <button class="btn sec full" style="margin-top:8px" onclick="fmAll()">من بداية الدورات لليوم</button>
+    <input id="fmQ" type="text" style="margin-top:10px" placeholder="🔍 بحث بالاسم أو رقم التسجيل" oninput="FM.q=this.value;renderFm()">
+    <div id="fmStu"></div>
+    <details style="margin-top:10px"><summary class="small">تصفية حسب نوع المتفرقة</summary><div class="dgrid" id="fmOpts" style="margin:8px 0 0"></div></details>
+  </div>
+  <div class="card">
+    <div id="fmSum" class="small" style="margin-bottom:6px"></div>
+    <ul class="list" id="fmList"></ul>
+  </div>
+</section>
 <section class="view" id="v-settings">
   <div class="card" id="meCard"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="meInfo"></div><button class="btn sec" style="flex:0 0 auto" onclick="logout()">تسجيل خروج</button></div></div>
   <div class="card adm" id="accCard">
@@ -454,6 +471,7 @@ details summary{cursor:pointer}
   <button data-v="report" onclick="go('report')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>التقرير</button>
   <button class="dt" data-v="det" onclick="go('det')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.5"/></svg>إنشاء كشف</button>
   <button class="ed" data-v="students" onclick="go('students')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5.5"/></svg>الطلبة</button>
+  <button class="adm" data-v="fxm" onclick="go('fxm')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/></svg>المتفرقة</button>
   <button data-v="settings" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>الإعدادات</button>
 </nav>
 
@@ -616,7 +634,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='2.0.2';const ONLINE=true;
+const APP_VERSION='2.1.0';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -1883,7 +1901,7 @@ function pushChanges(){
         if(n)n.by=w});
     }else{
       const touched=new Set(dates.filter(d=>ck(l.days[d])!==ck(od[d])));
-      if(fxCh&&l.days[curDate]&&hasPresent(l.days[curDate]))touched.add(curDate);
+      if(fxCh&&!adm&&l.days[curDate]&&hasPresent(l.days[curDate]))touched.add(curDate);
       touched.forEach(d=>{const n=l.days[d];if(n&&(hasPresent(n)||n.st||Object.keys(n.abs||{}).length))applyEdit(l,n,adm?'admin':role,w)});
       if(touched.size&&!adm)audit('تعديل',l,[...touched].sort().map(dm).join('، '));
     }
@@ -2129,6 +2147,59 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&READY)ren
 function fbaReady(){if(!window.FBA){lg('lgErr').textContent='تعذر تحميل البرنامج — تأكد من الإنترنت وافتحه من جديد';lgShow('lgMain');return}DEL=FBA.DEL;FBA.onAuth(onAuth)}
 lgShow('lgWait');
 if(window.FBA||window.FBA_ERR)fbaReady();else window.addEventListener('fba',fbaReady,{once:true});
+
+/* ---------- إدارة المتفرقة (الأدمن) ---------- */
+const FM={scope:'all',from:'',to:'',q:'',ks:null};let FML=[];
+function fmStart(){let m=today();S.batches.forEach(b=>leaves(b).forEach(l=>{Object.keys(l.days).forEach(d=>{if(d<m)m=d});l.students.forEach(s=>(s.fx||[]).forEach(e=>{if(e.since&&e.since<m)m=e.since}))}));return m}
+function fmEpisodes(){const n=IDX[FM.scope]?N(FM.scope):ROOT,t=today(),out=[];
+  leaves(n).forEach(l=>l.students.forEach(s=>{
+    (s.fx||[]).forEach(e=>out.push({l,s,src:'fx',e,k:e.k,since:e.since,end:e.end||null,due:e.due||null,cause:e.cause||'',note:e.note||''}));
+    let cur=null;Object.keys(l.days).filter(d=>{const x=l.days[d];return x.abs&&RMAP[x.abs[s.reg]]}).sort().forEach(d=>{const k=l.days[d].abs[s.reg];
+      if(cur&&cur.k===k&&addDays(cur.ds[cur.ds.length-1],1)===d){cur.ds.push(d);cur.end=addDays(d,1)}
+      else{cur={l,s,src:'days',k,ds:[d],since:d,end:addDays(d,1),cause:'',note:''};out.push(cur)}})}));
+  out.forEach(e=>{e.active=!e.end||e.end>t;e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1))});
+  const from=FM.from||'0000',to=FM.to||'9999',q=nameKey(FM.q||''),ks=FM.ks;
+  return out.filter(e=>e.since<=to&&(!e.end||e.end>from)&&(!ks||ks.includes(e.k))&&(!q||nameKey(e.s.name).includes(q)||e.s.reg.includes(q)))
+    .sort((a,b)=>b.since.localeCompare(a.since)||byReg(a.s,b.s))}
+function renderFm(){if(!isAdm())return;const v=document.getElementById('v-fxm');if(!v)return;
+  if(!FM.from)FM.from=fmStart();if(!FM.to)FM.to=today();
+  const sc=document.getElementById('fmScope');sc.innerHTML=scopeOptions(FM.scope);sc.value=IDX[FM.scope]?FM.scope:'all';
+  document.getElementById('fmFrom').value=FM.from;document.getElementById('fmTo').value=FM.to;
+  const ks=FM.ks;document.getElementById('fmOpts').innerHTML=REASONS.map(r=>{const on=!ks||ks.includes(r.k);return `<button class="opt ${on?'on':''}" onclick="fmTog('${r.k}')"><span class="dot" style="background:${r.c}"></span>${on?'☑':'☐'} ${r.t}</button>`}).join('');
+  FML=fmEpisodes();
+  const q=nameKey(FM.q||'');let sh='';
+  if(q){const n=IDX[FM.scope]?N(FM.scope):ROOT,st=[];leaves(n).forEach(l=>l.students.forEach(s=>{if(nameKey(s.name).includes(q)||s.reg.includes(q))st.push({l,s})}));
+    sh=st.length?`<div class="small" style="margin:4px 0">اضغط على الطالب عشان تضيف له متفرقة:</div><ul class="list">${st.slice(0,8).map(x=>`<li onclick="fmAddFor('${x.l.id}','${x.s.reg}')"><span class="nm"><b>${esc(x.s.name)}</b><span class="unit">${esc(x.s.reg)} — ${esc(unitTxt(x.l))}</span></span><span class="tb">＋ متفرقة</span></li>`).join('')}</ul>`:''}
+  document.getElementById('fmStu').innerHTML=sh;
+  const act=FML.filter(e=>e.active).length;
+  document.getElementById('fmSum').innerHTML=`<b>${FML.length}</b> متفرقة (فعالة ${act} · منتهية ${FML.length-act}) — من ${dm(FM.from)} إلى ${dm(FM.to)}`;
+  document.getElementById('fmList').innerHTML=FML.length?FML.slice(0,400).map((e,i)=>`<li onclick="fmEdit(${i})" class="${e.active?'':'muted'}"><span class="nm"><b>${esc(e.s.name)}</b> <span class="small">${esc(e.s.reg)}</span><span class="unit">${esc(unitTxt(e.l))}</span><span class="unit">${RMAP[e.k].t} — من ${dm(e.since)} ${e.end?'إلى '+dm(e.last):'(مستمرة)'} — ${daysTxt(e.dur)}${e.cause?' — '+esc(e.cause):''}</span></span><span class="badge ${e.active?'':'no'}">${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}</span></li>`).join('')+(FML.length>400?'<div class="empty">يعرض أول 400 — ضيّق البحث</div>':''):'<div class="empty">ما فيه متفرقة بهذي الشروط</div>'}
+function fmTog(k){const all=REASONS.map(r=>r.k);let a=FM.ks?[...FM.ks]:[...all];const i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);FM.ks=a.length===all.length?null:a;renderFm()}
+function fmAll(){FM.from=fmStart();FM.to=today();renderFm()}
+function fmAddFor(lid,reg){openHist(lid,reg);hAdd=true;drawHist()}
+function fmForm(e){const o=REASONS.map(r=>`<option value="${r.k}" ${e&&e.k===r.k?'selected':''}>${r.t}</option>`).join(''),on=e&&!e.end;
+  return `<label class="l" style="margin-top:0">النوع</label><select id="fk">${o}</select>
+  <div class="row"><div style="flex:1;min-width:0"><label class="l">من</label><input id="ff" type="date" style="width:100%;min-width:0" value="${e?e.since:''}"></div><div style="flex:1;min-width:0"><label class="l">إلى (آخر يوم)</label><input id="ft" type="date" style="width:100%;min-width:0" value="${e&&e.end?e.last:''}" ${on?'disabled':''}></div></div>
+  <label class="chk"><input id="fon" type="checkbox" ${on?'checked':''} onchange="document.getElementById('ft').disabled=this.checked"> لازالت مستمرة (بدون تاريخ نهاية)</label>
+  <label class="l">السبب</label><input id="fc" type="text" value="${esc(e?e.cause:'')}" placeholder="مثال: عملية زائدة">
+  <label class="l">ملاحظة</label><input id="fn" type="text" value="${esc(e?e.note:'')}" placeholder="اختياري">`}
+function fmEdit(i){const e=FML[i];if(!e)return;
+  form(`تعديل متفرقة — ${e.s.name}`,`<p class="small" style="margin:0 0 8px">${esc(e.s.reg)} — ${esc(unitTxt(e.l))}</p>${fmForm(e)}
+    <div class="row" style="margin-top:12px"><button class="btn sec" onclick="closeConfirm();fmAddFor('${e.l.id}','${e.s.reg}')">📜 سجل الطالب / إضافة</button><button class="btn dng" onclick="fmDel(${i})">🗑️ حذف</button></div>`,()=>fmSave(i),'حفظ التعديل')}
+function fmRead(){const k=document.getElementById('fk').value,from=document.getElementById('ff').value,on=document.getElementById('fon').checked,to=document.getElementById('ft').value;
+  if(!from){toast('حدد تاريخ البداية');return null}if(!on&&(!to||to<from)){toast('تاريخ النهاية لازم بعد البداية');return null}
+  return {k,from,on,to,end:on?null:addDays(to,1),cause:document.getElementById('fc').value.trim(),note:document.getElementById('fn').value.trim()}}
+function fmRemove(e){if(e.src==='fx')e.s.fx.splice(e.s.fx.indexOf(e.e),1);else e.ds.forEach(d=>{if(e.l.days[d]&&e.l.days[d].abs)delete e.l.days[d].abs[e.s.reg]})}
+function fmPut(l,s,x){const r=RMAP[x.k];
+  if(!r.fx){let d=x.from;const last=x.on?today():x.to;while(d<=last){if(!l.days[d])l.days[d]={present:null,abs:{}};if(!l.days[d].abs)l.days[d].abs={};l.days[d].abs[s.reg]=x.k;d=addDays(d,1)}}
+  else{s.fx=s.fx||[];s.fx.push({k:x.k,since:x.from,end:x.end,note:x.note,cause:x.cause,days:x.end?diffDays(x.from,x.end):null,due:null})}}
+function fmSave(i){const e=FML[i],x=fmRead();if(!x){document.getElementById('confirm').classList.add('on');return false}const {l,s}=e;
+  const clash=stEpisodes(l,s).find(o=>!(o.src==='fx'&&e.src==='fx'&&o.e===e.e)&&!(o.src==='day'&&e.src==='days'&&e.ds.includes(o.d))&&o.since<(x.end||'9999')&&(o.end||'9999')>x.from);
+  if(clash){showMsg('فيه تداخل',`الفترة تتداخل مع «${RMAP[clash.k].t}» من ${dm(clash.since)} ${clash.end?'إلى '+dm(clash.last):'(مستمرة)'}.\nعدّل التواريخ أو احذف الفترة الثانية أول.`);return false}
+  if(x.from<FM.from)FM.from=x.from;const snap=absSnap(l,s);fmRemove(e);fmPut(l,s,x);fixPresent(l,s,snap);save();renderAll();renderFm();toast('✓ تم تعديل المتفرقة')}
+function fmDel(i){const e=FML[i];closeConfirm();setTimeout(()=>ask(`حذف «${RMAP[e.k].t}» لـ ${e.s.name} من ${dm(e.since)}؟`,()=>{const snap=absSnap(e.l,e.s);fmRemove(e);fixPresent(e.l,e.s,snap);save();renderAll();renderFm();toast('تم الحذف')}),60)}
+{const _g2=go;go=function(v){if(v==='fxm'&&!isAdm())v='today';_g2(v);if(v==='fxm')renderFm()}}
+{const _ra=renderAll;renderAll=function(){_ra();try{if(view==='fxm')renderFm()}catch(e){console.error(e)}}}
 
 </script>
 </body>
