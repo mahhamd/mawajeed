@@ -596,7 +596,10 @@ try {
     token: () => auth.currentUser.getIdToken(),
     uid: () => auth.currentUser && auth.currentUser.uid,
     signup: (e, p) => A.createUserWithEmailAndPassword(auth, e, p).then(c => c.user.uid),
-    subCreate: async (e, p) => { const au = a2(); const c = await A.createUserWithEmailAndPassword(au, e, p); const id = c.user.uid; await A.signOut(au); return id; },
+    subCreate: async (e, p) => { const au = a2(); const c = await A.createUserWithEmailAndPassword(au, e, p); return c.user.uid; },
+    subLogin: async (e, p) => { const au = a2(); const c = await A.signInWithEmailAndPassword(au, e, p); return c.user.uid; },
+    subEnd: async () => { if (auth2) await A.signOut(auth2); },
+    subUndo: async () => { if (auth2 && auth2.currentUser) await A.deleteUser(auth2.currentUser); },
     subSetPass: async (e, old, np) => { const au = a2(); const c = await A.signInWithEmailAndPassword(au, e, old); await A.updatePassword(c.user, np); await A.signOut(au); },
     subDelete: async (e, p) => { const au = a2(); const c = await A.signInWithEmailAndPassword(au, e, p); await A.deleteUser(c.user); },
     get: p => F.getDoc(ref(p)).then(s => s.exists() ? s.data() : null),
@@ -634,7 +637,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='2.1.0';const ONLINE=true;
+const APP_VERSION='2.1.1';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -2093,20 +2096,28 @@ function drawUser(){const U=UED,ex=!!U.id,self=ex&&U.id===ME.uid;
   document.getElementById('uBody').innerHTML=h}
 async function uRun(fn,ok){const b=document.getElementById('uSave'),e=document.getElementById('uErr');if(b)b.disabled=true;e.className='note';e.textContent='جاري الحفظ...';
   try{await fn();closeUser();toast(ok)}catch(x){e.className='note bad';e.textContent=accErr(x)}if(b)b.disabled=false}
-function accErr(x){const c=(x&&x.code)||'';if(/email-already-in-use/.test(c))return 'هذا الاسم مستخدم لحساب ثاني';if(/weak-password/.test(c))return 'الرقم السري ضعيف — 6 خانات على الأقل';if(/permission/.test(c))return 'ما عندك صلاحية';if(/network/.test(c))return 'ما فيه اتصال بالإنترنت';if(/invalid-credential|wrong-password|user-not-found/.test(c))return 'الرقم السري المحفوظ لهذا الحساب ما يطابق — احذف الحساب وسوّه من جديد';return (x&&x.message)||String(x)}
+function accErr(x){const c=(x&&x.code)||'';if(/email-already-in-use/.test(c))return 'هذا الاسم بالضبط مستخدم لحساب ثاني';if(/weak-password/.test(c))return 'الرقم السري ضعيف — 6 خانات على الأقل';if(/permission/.test(c))return 'ما عندك صلاحية';if(/network/.test(c))return 'ما فيه اتصال بالإنترنت';if(/invalid-credential|wrong-password|user-not-found/.test(c))return 'الرقم السري المحفوظ لهذا الحساب ما يطابق — احذف الحساب وسوّه من جديد';return (x&&x.message)||String(x)}
 const useApi=()=>!!apiUrl();
+// إنشاء حساب دخول: إذا فشل حفظ بياناته نحذفه، وإذا لقينا حساب دخول قديم ناقص بنفس الاسم نكمّله
+async function subNew(em,pass,name){
+  try{return {id:await FBA.subCreate(em,pass),fresh:true}}
+  catch(e){if(!/email-already-in-use/.test(e.code||''))throw e;
+    if(USERS.some(u=>nameKey(u.name)===nameKey(name)))throw e;
+    try{return {id:await FBA.subLogin(em,pass),fresh:false}}
+    catch(_){throw new Error('فيه حساب دخول قديم بنفس الاسم ما اكتمل (من محاولة سابقة أو حساب محذوف). اكتب نفس الرقم السري اللي حطيته ذيك المرة، أو ميّز الاسم بكلمة زيادة')}}}
+async function subFinish(r,fn){try{await fn()}catch(e){if(r.fresh)try{await FBA.subUndo()}catch(_){}try{await FBA.subEnd()}catch(_){}throw e}try{await FBA.subEnd()}catch(_){}}
 async function accCreate(b){if(useApi())return api('create',b);
-  const em=await nameEmail(b.name),id=await FBA.subCreate(em,b.pass);
-  await FBA.commit([{op:'set',path:'users/'+id,data:{name:b.name,role:b.role,scope:b.scope,leaves:b.leaves,dg:b.dg,active:true,by:ME.name,t:nowT()}},{op:'set',path:'secrets/'+id,data:{e:em,p:b.pass}}])}
+  const em=await nameEmail(b.name),r=await subNew(em,b.pass,b.name),id=r.id;
+  await subFinish(r,()=>FBA.commit([{op:'set',path:'users/'+id,data:{name:b.name,role:b.role,scope:b.scope,leaves:b.leaves,dg:b.dg,active:true,by:ME.name,t:nowT()}},{op:'set',path:'secrets/'+id,data:{e:em,p:b.pass}}]))}
 async function accUpdate(id,b){if(useApi())return api('update',Object.assign({uid:id},b));
   const u=USERS.find(x=>x.id===id),sec=await FBA.get('secrets/'+id);
   const doc={};['role','scope','leaves','dg','active'].forEach(k=>{if(b[k]!==undefined)doc[k]=b[k]});
   if(b.name!==undefined&&nameKey(b.name)!==nameKey(u.name)){ // تغيير الاسم = حساب دخول جديد بنفس البيانات
     if(!sec)throw new Error('ما يمكن تغيير الاسم لهذا الحساب — احذفه وسوّه من جديد');
     if(id===ME.uid)throw new Error('ما تقدر تغيّر اسم حسابك وأنت داخل فيه');
-    const em=await nameEmail(b.name),np=b.pass||sec.p,nid=await FBA.subCreate(em,np);
+    const em=await nameEmail(b.name),np=b.pass||sec.p,r=await subNew(em,np,b.name),nid=r.id;
     const nd=Object.assign({},u,doc,{name:b.name});delete nd.id;
-    await FBA.commit([{op:'set',path:'users/'+nid,data:nd},{op:'set',path:'secrets/'+nid,data:{e:em,p:np}},{op:'del',path:'users/'+id},{op:'del',path:'secrets/'+id}]);
+    await subFinish(r,()=>FBA.commit([{op:'set',path:'users/'+nid,data:nd},{op:'set',path:'secrets/'+nid,data:{e:em,p:np}},{op:'del',path:'users/'+id},{op:'del',path:'secrets/'+id}]));
     try{await FBA.subDelete(sec.e,sec.p)}catch(e){}return}
   if(b.name!==undefined)doc.name=b.name;
   if(b.pass){if(!sec)throw new Error('ما يمكن تغيير الرقم لهذا الحساب — احذفه وسوّه من جديد');await FBA.subSetPass(sec.e,sec.p,b.pass);await FBA.commit([{op:'set',path:'secrets/'+id,data:{e:sec.e,p:b.pass}}])}
@@ -2120,7 +2131,7 @@ function saveUser(){const U=UED,name=document.getElementById('uName').value.repl
   if(name.length<2)return e.textContent='اكتب الاسم';
   if(!U.id&&pass.length<6)return e.textContent='الرقم السري 6 خانات على الأقل';if(pass&&pass.length<6)return e.textContent='الرقم السري 6 خانات على الأقل';
   if(U.role!=='admin'&&!U.scope.length)return e.textContent='اختر الوحدة';
-  const dup=USERS.find(x=>x.id!==U.id&&nameKey(x.name)===nameKey(name));if(dup)return e.textContent='فيه حساب بنفس الاسم — ميّزه (مثلاً أضف اسم الأب)';
+  const dup=USERS.find(x=>x.id!==U.id&&nameKey(x.name)===nameKey(name));if(dup)return e.textContent=`فيه حساب بنفس الاسم بالضبط: «${dup.name}» (${ROLES[dup.role]||''}) — ميّزه بكلمة زيادة`;
   const x=userCalc(U.role,U.scope),body={name,role:U.role,scope:U.scope,leaves:x.leaves,dg:x.dg};if(pass)body.pass=pass;
   uRun(()=>U.id?accUpdate(U.id,body):accCreate(body),U.id?'✓ تم حفظ الحساب'+(pass?' والرقم السري الجديد':''):`✓ تم إنشاء حساب ${name}`)}
 function toggleUser(){const U=UED;ask(U.active?`إيقاف حساب ${U.name}؟ ما يقدر يدخل لين تفعّله.`:`تفعيل حساب ${U.name}؟`,()=>uRun(()=>accUpdate(U.id,{active:!U.active}),U.active?'تم الإيقاف':'تم التفعيل'))}
