@@ -637,7 +637,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='2.1.4';const ONLINE=true;
+const APP_VERSION='2.2.1';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -701,7 +701,7 @@ function addDays(d,n){const x=new Date(d+'T12:00');x.setDate(x.getDate()+n);retu
 function diffDays(a,b){return Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/864e5)}
 function noteOf(s,date){const f=fxActive(s,date);if(!f)return '';let t;
   const due=f.due||(f.k==='home'&&f.end?f.end:null),late=due&&!f.end&&date>=due;
-  if(due){const n=f.days||diffDays(f.since,due);t=(f.k==='home'?'راحة ':f.k==='ext'?'مراجعة ':f.k==='death'?'إجازة وفاة ':'مدة متوقعة ')+`${daysTxt(n)} من ${dm(f.since)} إلى ${dm(addDays(due,-1))} — العودة ${dm(due)}`+(late?' (انتهت المدة)':'')}
+  if(due){const n=f.days||diffDays(f.since,due);t=(f.k==='home'?'راحة ':f.k==='ext'?'مراجعة ':f.k==='death'?'إجازة وفاة ':'مدة متوقعة ')+`${daysTxt(n)} من ${dm(f.since)} إلى ${dm(addDays(due,-1))} — العودة ${dm(due)}${f.rt?' الساعة '+t12(f.rt):''}`+(late?' (انتهت المدة)':'')}
   else{const n=diffDays(f.since,date)+1;t=`منذ ${dm(f.since)}`+(RMAP[f.k].fx==='open'?` (اليوم ${n})`:'')}
   return (f.cause?(f.k==='death'?'':'السبب: ')+f.cause+' — ':'')+(f.note?f.note+' — ':'')+t}
 // في التقارير: «مختصر» = الأسماء وأرقام التسجيل فقط بدون أيام وتواريخ وملاحظات
@@ -849,7 +849,7 @@ function drawSheet(){
   if(fx){const r=RMAP[fx.k];h+=`<div class="card" style="background:var(--warn2);border-color:#f0cdc3;margin:0 0 12px">
       <b style="color:var(--warn)">● ${r.t}</b><div class="small" style="margin:4px 0 10px">${esc(noteOf(s,curDate))}</div>
       ${r.fx==='perm'?`<button class="btn dng full" onclick="doReturn()">إلغاء ${r.t}</button>`:
-      `${fx.due&&!fx.end?`<div class="row" style="align-items:flex-end;margin-bottom:8px"><div><label class="l" style="margin-top:0">تمديد (أيام)</label><input id="shExt" type="number" inputmode="numeric" min="1" value="1"></div><button class="btn sec" style="flex:0 0 auto" onclick="extendFx()">⏩ تمديد</button></div>`:''}
+      `${fx.due&&!fx.end?`<div class="row" style="align-items:flex-end;margin-bottom:8px"><div><label class="l" style="margin-top:0">تمديد (أيام)</label><input id="shExt" type="number" inputmode="numeric" min="1" value="1"></div><button class="btn sec" style="flex:0 0 auto" onclick="extendFx()">⏩ تمديد</button></div><div class="row" style="align-items:flex-end;margin-bottom:8px"><div><label class="l" style="margin-top:0">ساعة الحضور (يوم ${dm(fx.due)})</label><input id="shRt2" type="time" value="${fx.rt||''}"></div><button class="btn sec" style="flex:0 0 auto" onclick="setRt()">🕐 حفظ الساعة</button></div>`:''}
        <label class="l" style="margin-top:0">تاريخ العودة</label><input id="shRet" type="date" value="${fx.due&&fx.due<=curDate?fx.due:curDate}">
        <button class="btn full" style="margin-top:8px" onclick="doReturn()">✅ عودة للموجود</button>`}</div>`}
   h+=`<b style="font-size:14px">متفرقة مستمرة</b><div class="dgrid" style="margin:8px 0 10px">`+RFIX.map(r=>ob(r,shSel===r.k||(!shSel&&fx&&fx.k===r.k),`shSel='${r.k}';drawSheet()`)).join('')+`</div>`;
@@ -857,6 +857,7 @@ function drawSheet(){
       <b>${sel.t}</b><span class="small"> — ${sel.fx==='days'?'إذا خلصت الأيام يطلع لك تنبيه: تمديد أو عودة':sel.fx==='open'?'يبقى في المتفرقة لين تضغط «عودة»':'يبقى في المتفرقة لين تلغيه'}</span>
       <div class="row"><div><label class="l">تاريخ البداية</label><input id="shSince" type="date" value="${curDate}"></div>
       ${sel.fx==='days'||shSel==='hosp'?`<div><label class="l">${shSel==='home'?'عدد أيام الراحة':shSel==='ext'?'عدد أيام المراجعة':shSel==='death'?'عدد أيام الإجازة':'المدة المتوقعة (اختياري)'}</label><input id="shDays" type="number" inputmode="numeric" min="1" value="${shSel==='home'||shSel==='death'?3:shSel==='ext'?1:''}" placeholder="أيام" oninput="shPrev()"></div>`:''}</div>
+      ${sel.fx==='days'||shSel==='hosp'?`<label class="l">ساعة الحضور يوم العودة (اختياري)</label><input id="shRt" type="time" value="">`:''}
       <p class="small" id="shPrevT" style="margin:6px 0 0"></p>
       ${shSel==='hosp'||shSel==='home'||shSel==='death'?`<label class="l">${shSel==='death'?'المتوفى (صلة القرابة)':'السبب'}</label><input id="shCause" type="text" placeholder="${shSel==='hosp'?'مثال: عملية زائدة':shSel==='death'?'مثال: وفاة الوالد':'مثال: كسر في اليد'}">`:''}
       <label class="l">ملاحظة (اختياري)</label><input id="shNote" type="text" placeholder="مثال: بقرار رقم 45">
@@ -882,9 +883,11 @@ function applyFx(){
   // أي حالة سابقة تتقاطع مع البداية الجديدة تنتهي قبلها
   s.fx=s.fx.filter(e=>e.since<since||(e.since>=since&&false));
   s.fx.forEach(e=>{if(!e.end||e.end>since)e.end=since});
-  s.fx.push({k,since,note,cause,days,due:days?addDays(since,days):null,end:null});
+  const rte=document.getElementById('shRt'),rt=rte&&days?rte.value:'';
+  const ne={k,since,note,cause,days,due:days?addDays(since,days):null,end:null};if(rt)ne.rt=rt;s.fx.push(ne);
   Object.keys(l.days).forEach(d=>{if(d>=since)delete l.days[d].abs[shR]});
   fixPresent(l,s,snap);save();closeSheet();renderAll();toast(`${r.t} — من ${dm(since)}`+(days?` لمدة ${daysTxt(days)}`:''))}
+function setRt(){const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;const v=document.getElementById('shRt2').value;if(v)a.rt=v;else delete a.rt;save();closeSheet();renderAll();toast(v?'🕐 ساعة الحضور '+t12(v):'انمسحت الساعة')}
 function doReturn(){
   const l=N(shL),s=l.students.find(x=>x.reg===shR),a=fxActive(s,curDate);if(!a)return;const r=RMAP[a.k];
   const ret=(document.getElementById('shRet')||{}).value||curDate;
@@ -1389,7 +1392,8 @@ function stEpisodes(l,s){const t=today(),out=[];
   (s.fx||[]).forEach((e,i)=>out.push({src:'fx',i,e,k:e.k,since:e.since,end:e.end||null,due:e.due||null,cause:e.cause||'',note:e.note||''}));
   Object.entries(l.days).forEach(([d,x])=>{const k=x.abs&&x.abs[s.reg];if(k&&RMAP[k])out.push({src:'day',d,k,since:d,end:addDays(d,1),cause:'',note:''})});
   out.forEach(e=>{e.active=!e.end||e.end>t;e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1));
-    e.endTxt=e.end?dm(e.last):(e.due?`مستمرة (العودة المتوقعة ${dm(e.due)})`:'مستمرة');
+    if(!e.end&&e.due){e.dur=diffDays(e.since,e.due>t?e.due:addDays(t,1));e.plan=1}
+    e.endTxt=e.end?dm(e.last)+(e.e&&e.e.rt?' — الحضور '+t12(e.e.rt):''):(e.due?`${dm(addDays(e.due,-1))} — العودة ${dm(e.due)}${e.e&&e.e.rt?' الساعة '+t12(e.e.rt):''}`:'مستمرة');
     e.info=[e.cause?(e.k==='death'?'':'السبب: ')+e.cause:'',e.note].filter(Boolean).join(' — ')});
   return out.sort((a,b)=>b.since.localeCompare(a.since))}
 function openHist(lid,reg){hL=lid;hR=reg;hAdd=false;closeSheet();document.getElementById('histSheet').classList.add('on');drawHist()}
@@ -1400,12 +1404,13 @@ function drawHist(){const {l,s}=hS(),E=stEpisodes(l,s);
   document.getElementById('hSub').textContent=`${s.reg} — ${unitTxt(l)}${s.memo?' — '+s.memo:''}`;
   const sum={};E.forEach(e=>{sum[e.k]=sum[e.k]||{n:0,d:0};sum[e.k].n++;sum[e.k].d+=e.dur});
   let h=E.length?`<div class="card" style="margin:0 0 10px;background:#fafaf8;padding:10px 12px"><b>المجموع: ${timesTxt(E.length)}</b><div class="small" style="line-height:1.8">${Object.entries(sum).map(([k,v])=>`${RMAP[k].t}: ${timesTxt(v.n)} (${daysTxt(v.d)})`).join(' · ')}</div></div>`:'<div class="empty">ما عليه أي متفرقة مسجلة</div>';
-  h+=E.map((e,i)=>`<div class="ep ${e.active?(e.k==='hosp'?'hos':'act'):''}" style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1"><b>${RMAP[e.k].t}</b> — ${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}<br>من ${dm(e.since)} ${e.end?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)}${e.info?`<br><span style="font-size:13px">${esc(e.info)}</span>`:''}</div><button class="del" onclick="delEp(${i})" aria-label="حذف">×</button></div>`).join('');
+  h+=E.map((e,i)=>`<div class="ep ${e.active?(e.k==='hosp'?'hos':'act'):''}" style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1"><b>${RMAP[e.k].t}</b> — ${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}<br>من ${dm(e.since)} ${e.end||e.plan?'إلى '+e.endTxt:'— '+e.endTxt} — ${daysTxt(e.dur)}${e.info?`<br><span style="font-size:13px">${esc(e.info)}</span>`:''}${typeof epBy==='function'?epBy(l,s,e):''}</div><button class="del" onclick="delEp(${i})" aria-label="حذف">×</button></div>`).join('');
   if(hAdd){const o=REASONS.map(r=>`<option value="${r.k}">${r.t}</option>`).join('');
     h+=`<div class="card" style="margin:10px 0 0;padding:10px 12px"><b>إضافة متفرقة سابقة</b>
       <label class="l">النوع</label><select id="hk">${o}</select>
       <div class="row"><div><label class="l">من</label><input id="hf" type="date" value="${addDays(curDate,-3)}"></div><div><label class="l">إلى (آخر يوم)</label><input id="ht" type="date" value="${addDays(curDate,-1)}"></div></div>
       <label class="chk"><input id="hon" type="checkbox" onchange="document.getElementById('ht').disabled=this.checked"> لازالت مستمرة (بدون تاريخ نهاية)</label>
+      <label class="l">ساعة الحضور يوم العودة (اختياري)</label><input id="hrt" type="time" value="">
       <label class="l">السبب</label><input id="hc" type="text" placeholder="مثال: عملية زائدة">
       <label class="l">ملاحظة</label><input id="hn" type="text" placeholder="اختياري">
       <div class="row" style="margin-top:10px"><button class="btn" onclick="saveEp()">حفظ</button><button class="btn sec" onclick="hAdd=false;drawHist()">إلغاء</button></div></div>`}
@@ -1416,11 +1421,11 @@ function saveEp(){const {l,s}=hS(),k=document.getElementById('hk').value,r=RMAP[
   if(!from)return toast('حدد تاريخ البداية');if(!on&&(!to||to<from))return toast('تاريخ النهاية لازم بعد البداية');
   const end=on?null:addDays(to,1),cause=document.getElementById('hc').value.trim(),note=document.getElementById('hn').value.trim();
   // منع التداخل مع فترة مسجلة
-  const clash=stEpisodes(l,s).find(e=>e.since<(end||'9999')&&(e.end||'9999')>from);
+  const clash=stEpisodes(l,s).find(e=>e.since<(end||'9999')&&(e.end||e.due||'9999')>from);
   if(clash)return showMsg('فيه تداخل',`الفترة تتداخل مع «${RMAP[clash.k].t}» من ${dm(clash.since)} ${clash.end?'إلى '+dm(clash.last):'(مستمرة)'}.\nعدّل التواريخ أو احذف الفترة القديمة أول.`);
   const snap=absSnap(l,s);
   if(!r.fx){let d=from;const last=on?curDate:to;while(d<=last){if(!l.days[d])l.days[d]={present:null,abs:{}};l.days[d].abs[s.reg]=k;d=addDays(d,1)}}
-  else{s.fx=s.fx||[];s.fx.push({k,since:from,end,note,cause,days:end?diffDays(from,end):null,due:null})}
+  else{s.fx=s.fx||[];const ne={k,since:from,end,note,cause,days:end?diffDays(from,end):null,due:null};const rte=document.getElementById('hrt');if(rte&&rte.value&&end)ne.rt=rte.value;if(typeof fxPlan==='function')fxPlan(ne);s.fx.push(ne)}
   fixPresent(l,s,snap);save();hAdd=false;renderAll();drawHist();toast('تمت الإضافة للسجل ✓')}
 function delEp(i){const {l,s}=hS(),e=stEpisodes(l,s)[i];
   ask(`حذف «${RMAP[e.k].t}» من ${dm(e.since)} من السجل؟`,()=>{const snap=absSnap(l,s);
@@ -1908,7 +1913,7 @@ function pushChanges(){
       touched.forEach(d=>{const n=l.days[d];if(n&&(hasPresent(n)||n.st||Object.keys(n.abs||{}).length))applyEdit(l,n,adm?'admin':role,w)});
       if(touched.size&&!adm)audit('تعديل',l,[...touched].sort().map(dm).join('، '));
     }
-    cur=leafRepr(l);const pairs=[];
+    stampBy(l,old,w);cur=leafRepr(l);const pairs=[];
     if(canon(cur.students)!==canon(old.students))pairs.push([['students'],cur.students]);
     [...new Set([...Object.keys(cur.fx),...Object.keys(ofx)])].forEach(r=>{if(canon(cur.fx[r])!==canon(ofx[r]))pairs.push([['fx',r],cur.fx[r]===undefined?DEL:cur.fx[r]])});
     [...new Set([...Object.keys(cur.days),...Object.keys(od)])].forEach(d=>{if(canon(cur.days[d])!==canon(od[d]))pairs.push([['days',d],cur.days[d]===undefined?DEL:cur.days[d]])});
@@ -1920,7 +1925,7 @@ function pushChanges(){
       if(canon(cur)===canon(old||[]))return;if(!adm&&!(ME.dg||[]).includes(g))return;
       ops.push({op:'set',path:'dets/'+g,data:{items:cur}});SY.dets[g]=clone(cur)})}
   if(ops.length)FBA.commit(ops).catch(e=>toast('تعذر الحفظ: '+errMsg(e)));
-  if(treeCh)refreshUserScopes();
+  if(treeCh){syncSubs();refreshUserScopes()} // وحدات جديدة: نبدأ نتابع تحديثاتها على طول
   if(reverted.length){const m=reverted.includes('lock')?lockMsg({days:{[curDate]:{st:'sub'}}}):reverted.includes('view')?'حسابك مشاهدة فقط':'تعديل بيانات الطلبة للأدمن فقط';setTimeout(()=>{toast(m);renderAll()},30)}
 }
 function detGrp(d){if(ME.role==='gr'){const g=(ME.dg||[])[0];if(g)return g}return d.batchId}
@@ -2165,11 +2170,11 @@ const FM={scope:'all',from:'',to:'',q:'',ks:null};let FML=[];
 function fmStart(){let m=today();S.batches.forEach(b=>leaves(b).forEach(l=>{Object.keys(l.days).forEach(d=>{if(d<m)m=d});l.students.forEach(s=>(s.fx||[]).forEach(e=>{if(e.since&&e.since<m)m=e.since}))}));return m}
 function fmEpisodes(){const n=IDX[FM.scope]?N(FM.scope):ROOT,t=today(),out=[];
   leaves(n).forEach(l=>l.students.forEach(s=>{
-    (s.fx||[]).forEach(e=>out.push({l,s,src:'fx',e,k:e.k,since:e.since,end:e.end||null,due:e.due||null,cause:e.cause||'',note:e.note||''}));
+    (s.fx||[]).forEach(e=>out.push({l,s,src:'fx',e,k:e.k,since:e.since,end:e.end||null,due:e.due||null,rt:e.rt||'',cause:e.cause||'',note:e.note||''}));
     let cur=null;Object.keys(l.days).filter(d=>{const x=l.days[d];return x.abs&&RMAP[x.abs[s.reg]]}).sort().forEach(d=>{const k=l.days[d].abs[s.reg];
       if(cur&&cur.k===k&&addDays(cur.ds[cur.ds.length-1],1)===d){cur.ds.push(d);cur.end=addDays(d,1)}
       else{cur={l,s,src:'days',k,ds:[d],since:d,end:addDays(d,1),cause:'',note:''};out.push(cur)}})}));
-  out.forEach(e=>{e.active=!e.end||e.end>t;e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1))});
+  out.forEach(e=>{e.active=!e.end||e.end>t;e.last=e.end?addDays(e.end,-1):null;e.dur=diffDays(e.since,e.end||addDays(t,1));if(!e.end&&e.due){e.plan=1;e.dur=diffDays(e.since,e.due>t?e.due:addDays(t,1))}});
   const from=FM.from||'0000',to=FM.to||'9999',q=nameKey(FM.q||''),ks=FM.ks;
   return out.filter(e=>e.since<=to&&(!e.end||e.end>from)&&(!ks||ks.includes(e.k))&&(!q||nameKey(e.s.name).includes(q)||e.s.reg.includes(q)))
     .sort((a,b)=>b.since.localeCompare(a.since)||byReg(a.s,b.s))}
@@ -2185,14 +2190,15 @@ function renderFm(){if(!isAdm())return;const v=document.getElementById('v-fxm');
   document.getElementById('fmStu').innerHTML=sh;
   const act=FML.filter(e=>e.active).length;
   document.getElementById('fmSum').innerHTML=`<b>${FML.length}</b> متفرقة (فعالة ${act} · منتهية ${FML.length-act}) — من ${dm(FM.from)} إلى ${dm(FM.to)}`;
-  document.getElementById('fmList').innerHTML=FML.length?FML.slice(0,400).map((e,i)=>`<li onclick="fmEdit(${i})" class="${e.active?'':'muted'}"><span class="nm"><b>${esc(e.s.name)}</b> <span class="small">${esc(e.s.reg)}</span><span class="unit">${esc(unitTxt(e.l))}</span><span class="unit">${RMAP[e.k].t} — من ${dm(e.since)} ${e.end?'إلى '+dm(e.last):'(مستمرة)'} — ${daysTxt(e.dur)}${e.cause?' — '+esc(e.cause):''}</span></span><span class="badge ${e.active?'':'no'}">${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}</span></li>`).join('')+(FML.length>400?'<div class="empty">يعرض أول 400 — ضيّق البحث</div>':''):'<div class="empty">ما فيه متفرقة بهذي الشروط</div>'}
+  document.getElementById('fmList').innerHTML=FML.length?FML.slice(0,400).map((e,i)=>`<li onclick="fmEdit(${i})" class="${e.active?'':'muted'}"><span class="nm"><b>${esc(e.s.name)}</b> <span class="small">${esc(e.s.reg)}</span><span class="unit">${esc(unitTxt(e.l))}</span><span class="unit">${RMAP[e.k].t} — من ${dm(e.since)} ${e.end?'إلى '+dm(e.last):e.plan?'إلى '+dm(addDays(e.due,-1))+' — العودة '+dm(e.due):'(مستمرة)'} — ${daysTxt(e.dur)}${e.rt?' — الحضور '+t12(e.rt):''}${e.cause?' — '+esc(e.cause):''}</span>${epBy(e.l,e.s,e)}</span><span class="badge ${e.active?'':'no'}">${e.active?(e.k==='hosp'?'لازال':'فعالة'):'منتهية'}</span></li>`).join('')+(FML.length>400?'<div class="empty">يعرض أول 400 — ضيّق البحث</div>':''):'<div class="empty">ما فيه متفرقة بهذي الشروط</div>'}
 function fmTog(k){const all=REASONS.map(r=>r.k);let a=FM.ks?[...FM.ks]:[...all];const i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);FM.ks=a.length===all.length?null:a;renderFm()}
 function fmAll(){FM.from=fmStart();FM.to=today();renderFm()}
 function fmAddFor(lid,reg){openHist(lid,reg);hAdd=true;drawHist()}
-function fmForm(e){const o=REASONS.map(r=>`<option value="${r.k}" ${e&&e.k===r.k?'selected':''}>${r.t}</option>`).join(''),on=e&&!e.end;
+function fmForm(e){const o=REASONS.map(r=>`<option value="${r.k}" ${e&&e.k===r.k?'selected':''}>${r.t}</option>`).join(''),on=e&&!e.end&&!e.due,lastV=e?(e.end?e.last:e.due?addDays(e.due,-1):''):'';
   return `<label class="l" style="margin-top:0">النوع</label><select id="fk">${o}</select>
-  <div class="row"><div style="flex:1;min-width:0"><label class="l">من</label><input id="ff" type="date" style="width:100%;min-width:0" value="${e?e.since:''}"></div><div style="flex:1;min-width:0"><label class="l">إلى (آخر يوم)</label><input id="ft" type="date" style="width:100%;min-width:0" value="${e&&e.end?e.last:''}" ${on?'disabled':''}></div></div>
+  <div class="row"><div style="flex:1;min-width:0"><label class="l">من</label><input id="ff" type="date" style="width:100%;min-width:0" value="${e?e.since:''}"></div><div style="flex:1;min-width:0"><label class="l">إلى (آخر يوم)</label><input id="ft" type="date" style="width:100%;min-width:0" value="${lastV}" ${on?'disabled':''}></div></div>
   <label class="chk"><input id="fon" type="checkbox" ${on?'checked':''} onchange="document.getElementById('ft').disabled=this.checked"> لازالت مستمرة (بدون تاريخ نهاية)</label>
+  <label class="l">ساعة الحضور يوم العودة (اختياري)</label><input id="frt" type="time" value="${e&&e.rt?e.rt:''}">
   <label class="l">السبب</label><input id="fc" type="text" value="${esc(e?e.cause:'')}" placeholder="مثال: عملية زائدة">
   <label class="l">ملاحظة</label><input id="fn" type="text" value="${esc(e?e.note:'')}" placeholder="اختياري">`}
 let FME=null;
@@ -2205,15 +2211,27 @@ function fmEdit(i){const e=FML[i];if(!e)return;FME=fmKey(e);
     <div class="row" style="margin-top:12px"><button class="btn sec" onclick="closeConfirm();fmAddFor('${e.l.id}','${e.s.reg}')">📜 سجل الطالب / إضافة</button><button class="btn dng" onclick="fmDel(${i})">🗑️ حذف</button></div>`,()=>fmSave(i),'حفظ التعديل')}
 function fmRead(){const k=document.getElementById('fk').value,from=document.getElementById('ff').value,on=document.getElementById('fon').checked,to=document.getElementById('ft').value;
   if(!from){toast('حدد تاريخ البداية');return null}if(!on&&(!to||to<from)){toast('تاريخ النهاية لازم بعد البداية');return null}
-  return {k,from,on,to,end:on?null:addDays(to,1),cause:document.getElementById('fc').value.trim(),note:document.getElementById('fn').value.trim()}}
+  return {k,from,on,to,end:on?null:addDays(to,1),rt:(document.getElementById('frt')||{}).value||'',cause:document.getElementById('fc').value.trim(),note:document.getElementById('fn').value.trim()}}
 function fmRemove(e){if(e.src==='fx')e.s.fx.splice(e.s.fx.indexOf(e.e),1);else e.ds.forEach(d=>{if(e.l.days[d]&&e.l.days[d].abs)delete e.l.days[d].abs[e.s.reg]})}
 function fmPut(l,s,x){const r=RMAP[x.k];
   if(!r.fx){let d=x.from;const last=x.on?today():x.to;while(d<=last){if(!l.days[d])l.days[d]={present:null,abs:{}};if(!l.days[d].abs)l.days[d].abs={};l.days[d].abs[s.reg]=x.k;d=addDays(d,1)}}
-  else{s.fx=s.fx||[];s.fx.push({k:x.k,since:x.from,end:x.end,note:x.note,cause:x.cause,days:x.end?diffDays(x.from,x.end):null,due:null})}}
+  else{s.fx=s.fx||[];const ne={k:x.k,since:x.from,end:x.end,note:x.note,cause:x.cause,days:x.end?diffDays(x.from,x.end):null,due:null};if(x.rt)ne.rt=x.rt;if(x.by)ne.by=x.by;fxPlan(ne);s.fx.push(ne)}}
+// راحة/وفاة بتاريخ عودة بالمستقبل: تنحفظ كـ«عودة متوقعة» (due) مثل ما يسويها البرنامج — مو «مستمرة»
+function fxPlan(e){const r=RMAP[e.k];if(r&&r.fx==='days'&&e.end&&e.end>today()){e.days=diffDays(e.since,e.end);e.due=e.end;e.end=null}return e}
+// المدخل — يظهر للأدمن فقط
+function epBy(l,s,e){if(!isAdm())return '';let b=null;
+  if(e.src==='fx')b=e.e&&e.e.by;else{const d=e.src==='day'?e.d:(e.ds&&e.ds[0]);const x=d&&l.days[d];b=x&&x.aby&&x.aby[s.reg]}
+  return b&&b.n?`<br><span class="small" style="color:#6a5a2a">👤 المدخل: ${esc(b.n)}${b.t?' · '+tf(b.t):''}</span>`:''}
+// ختم المدخل على المتفرقة الجديدة (حالات fx + متفرقة الأيام)
+function stampBy(l,old,w){const ofx=old.fx||{},od=old.days||{};
+  l.students.forEach(s=>(s.fx||[]).forEach(e=>{if(e.by)return;const o=(ofx[s.reg]||[]).find(x=>x.k===e.k&&x.since===e.since);if(o&&o.by){e.by=o.by;return}if(!o)e.by=w}));
+  Object.keys(l.days).forEach(d=>{const n=l.days[d],o=od[d];if(!n)return;const a=n.abs||{},oa=(o&&o.abs)||{},ob=(o&&o.aby)||{};let ch=false;const nb={};
+    Object.keys(a).forEach(r=>{if(!RMAP[a[r]])return;if(oa[r]===a[r]&&ob[r])nb[r]=ob[r];else if(oa[r]!==a[r]){nb[r]=w;ch=true}else if(n.aby&&n.aby[r])nb[r]=n.aby[r]});
+    if(Object.keys(nb).length)n.aby=nb;else delete n.aby})}
 function fmSave(i){const x=fmRead();if(!x){document.getElementById('confirm').classList.add('on');return false}const e=FME&&fmFind(FME);if(!e){toast('تغيّرت البيانات — افتح المتفرقة من جديد');renderFm();return}const {l,s}=e;
-  const clash=stEpisodes(l,s).find(o=>!(o.src==='fx'&&e.src==='fx'&&o.e===e.e)&&!(o.src==='day'&&e.src==='days'&&e.ds.includes(o.d))&&o.since<(x.end||'9999')&&(o.end||'9999')>x.from);
+  const clash=stEpisodes(l,s).find(o=>!(o.src==='fx'&&e.src==='fx'&&o.e===e.e)&&!(o.src==='day'&&e.src==='days'&&e.ds.includes(o.d))&&o.since<(x.end||'9999')&&(o.end||o.due||'9999')>x.from);
   if(clash){showMsg('فيه تداخل',`الفترة تتداخل مع «${RMAP[clash.k].t}» من ${dm(clash.since)} ${clash.end?'إلى '+dm(clash.last):'(مستمرة)'}.\nعدّل التواريخ أو احذف الفترة الثانية أول.`);return false}
-  if(x.from<FM.from)FM.from=x.from;const snap=absSnap(l,s);fmRemove(e);fmPut(l,s,x);fixPresent(l,s,snap);save();renderAll();renderFm();toast('✓ تم تعديل المتفرقة')}
+  if(x.from<FM.from)FM.from=x.from;if(e.src==='fx'&&e.e.by)x.by=e.e.by;const snap=absSnap(l,s);fmRemove(e);fmPut(l,s,x);fixPresent(l,s,snap);save();renderAll();renderFm();toast('✓ تم تعديل المتفرقة')}
 function fmDel(i){const e=FME&&fmFind(FME);closeConfirm();if(!e){toast('تغيّرت البيانات — افتح المتفرقة من جديد');renderFm();return}setTimeout(()=>ask(`حذف «${RMAP[e.k].t}» لـ ${e.s.name} من ${dm(e.since)}؟`,()=>{const snap=absSnap(e.l,e.s);fmRemove(e);fixPresent(e.l,e.s,snap);save();renderAll();renderFm();toast('تم الحذف')}),60)}
 {const _g2=go;go=function(v){if(v==='fxm'&&!isAdm())v='today';_g2(v);if(v==='fxm')renderFm()}}
 {const _ra=renderAll;renderAll=function(){_ra();try{if(view==='fxm')renderFm()}catch(e){console.error(e)}}}
