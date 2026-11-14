@@ -637,7 +637,7 @@ const REASONS=[
 // day = لليوم فقط · open = مستمر لين «عودة» (مدة متوقعة اختيارية) · days = عدد أيام ثم تنبيه للتمديد أو العودة · perm = فصل/اعتذار
 const RDAY=REASONS.filter(r=>!r.fx),RFIX=REASONS.filter(r=>r.fx);
 const RMAP=Object.fromEntries(REASONS.map(r=>[r.k,r]));
-const APP_VERSION='2.1.2';const ONLINE=true;
+const APP_VERSION='2.1.4';const ONLINE=true;
 const KEY='mawajeed_v2',OLDKEY='mawajeed_v1',SNAP='mawajeed_snap',VERKEY='mawajeed_appver';
 const ROOT={id:'all',name:'جميع الدفعات',children:[],students:[],days:{}};
 let S,IDX={},view='today',filter='all',curDate=today(),stLeaf=null;
@@ -686,9 +686,9 @@ function headLines(n){if(n===ROOT)return [ROOT.name];if(n.virtual)return [n.name
 function fullLabel(n){return headLines(n).join(' — ')}
 function relChain(leaf,scope){const c=chain(leaf),i=scope===ROOT?-1:c.indexOf(scope);return c.slice(i+1)}
 function relLabel(leaf,scope){return relChain(leaf,scope).map(label).join(' / ')}
-function shortName(n){if(n.virtual)return n.name;const d=IDX[n.id].d,p=IDX[n.id].p;if(d===1){return n.name.replace(/^دفعة\s*/,'').split(/\s+/)[0]+(n.num?' '+n.num:'')}const i=p.children.indexOf(n)+1;return (d===2?'س':d===3?'ف':'')+i}
+function shortName(n){if(n.virtual)return n.name;const d=IDX[n.id].d,p=IDX[n.id].p;if(d===1){return n.name.replace(/^دفعة\s*/,'').split(/\s+/)[0]+(n.num?' '+n.num:'')}const i=n.pos||p.children.indexOf(n)+1;return (d===2?'س':d===3?'ف':'')+i}
 function relShort(leaf,scope){return relChain(leaf,scope).map(shortName).join('/')}
-function info(l){const c=chain(l),ix=i=>c[i]?IDX[c[i].id].p.children.indexOf(c[i])+1:'';return {abbr:c[0].abbr||'',co:ix(1),pl:ix(2)}}
+function info(l){const c=chain(l),ix=i=>c[i]?(c[i].pos||IDX[c[i].id].p.children.indexOf(c[i])+1):'';return {abbr:c[0].abbr||'',co:ix(1),pl:ix(2)}}
 function tag(x){const i=info(x.l);return [i.abbr,x.s.reg,x.s.name,i.co?'س'+i.co:'',i.pl?'ف'+i.pl:''].filter(Boolean).join(' ')}
 function unitTxt(l){const i=info(l);return [i.abbr,i.co?'السرية '+i.co:'',i.pl?'الفصيل '+i.pl:''].filter(Boolean).join(' · ')}
 function dayGet(l,date){return l.days[date]||{present:null,abs:{}}}
@@ -1835,7 +1835,7 @@ function myDetGroups(){if(isAdm()){const t=SY.tree||{};return [...(t.batches||[]
 
 function buildS(){
   const pr=loadPrefs(),t=SY.tree||{batches:[],groups:[]},adm=isAdm(),keep=new Set(myLeafIds());
-  const mkN=x=>{const n={id:x.id,name:x.name,num:x.num||'',abbr:x.abbr||'',children:[],students:[],days:{}};
+  const mkN=(x,i)=>{const n={id:x.id,name:x.name,num:x.num||'',abbr:x.abbr||'',children:[],students:[],days:{}};if(!adm)n.pos=i+1;
     if(x.children&&x.children.length){n.children=x.children.map(mkN).filter(Boolean);return n.children.length?n:null}
     if(!adm&&!keep.has(x.id))return null;
     const d=SY.leaves[x.id];if(d){n.students=attachFx(d.students,d.fx);n.days=clone(d.days||{})}
@@ -2055,7 +2055,7 @@ function renderAcc(){
   const ui=document.getElementById('apiIn');if(ui&&document.activeElement!==ui)ui.value=apiUrl();
   const ul=document.getElementById('usrList');if(!ul)return;
   const arr=[...USERS].sort((a,b)=>(ROLE_ORDER.indexOf(a.role)-ROLE_ORDER.indexOf(b.role))||String(a.name).localeCompare(b.name,'ar'));
-  ul.innerHTML=arr.length?arr.map(u=>`<li onclick="openUser('${u.id}')" style="${u.active?'':'opacity:.5'}"><span class="nm"><b>${esc(u.name)}</b>${u.id===ME.uid?' (أنت)':''}<span class="unit">${ROLES[u.role]||u.role} — ${esc(userScopeTxt(u))}</span></span>${u.active?'':'<span class="badge no">موقوف</span>'}</li>`).join(''):'<div class="empty">لا توجد حسابات</div>';
+  ul.innerHTML=arr.length?arr.map(u=>`<li onclick="openUser('${u.id}')" style="${u.active?'':'opacity:.5'}"><span class="nm"><b>${esc(u.name)}</b>${u.id===ME.uid?' (أنت)':''}<span class="unit">${ROLES[u.role]||u.role} — ${esc(userScopeTxt(u))}</span></span>${u.role!=='view'&&u.role!=='admin'&&(u.scope||[]).length>1?'<span class="badge no">⚠️ أكثر من وحدة</span>':''}${u.active?'':'<span class="badge no">موقوف</span>'}</li>`).join(''):'<div class="empty">لا توجد حسابات</div>';
 }
 function saveApi(){const v=document.getElementById('apiIn').value.trim();if(!/^https:\/\//.test(v))return toast('الرابط لازم يبدأ بـ https://');
   localStorage.setItem('mawajeed_api',v);FBA.commit([{op:'set',path:'meta/conf',data:Object.assign({},CONF,{api:v})}]).catch(e=>toast(errMsg(e)));
@@ -2084,12 +2084,12 @@ function uSet(k,v){UED[k]=v;if(k==='role')UED.scope=[];drawUser()}
 function uTog(id,on){const s=new Set(UED.scope);if(on)s.add(id);else s.delete(id);if(id==='ALL'&&on)s.clear(),s.add('ALL');else if(on)s.delete('ALL');UED.scope=[...s];drawUser()}
 function drawUser(){const U=UED,ex=!!U.id,self=ex&&U.id===ME.uid;
   document.getElementById('uTitle').textContent=ex?'تعديل حساب':'حساب جديد';
-  const multi=U.role==='view'||U.role==='tr',ch=scopeChoices(U.role);
+  const multi=U.role==='view',ch=scopeChoices(U.role);if(!multi&&U.scope.length>1)U.scope=[];
   let h=`<label class="l" style="margin-top:0">الاسم بالعربي (يدخل فيه)</label><input id="uName" type="text" value="${esc(U.name)}" placeholder="مثال: محمد العنزي" oninput="UED.name=this.value">
   ${ex?`<div class="small" style="margin-top:10px">الرقم السري الحالي: <b id="uCur" dir="ltr">••••••</b> <button class="tb" onclick="showPass()">عرض</button></div>`:''}<label class="l">${ex?'رقم سري جديد (اتركه فاضي إذا ما تبي تغيّره)':'الرقم السري (6 خانات على الأقل)'}</label><input id="uPass" type="text" autocomplete="off" value="${esc(U.pass||'')}" oninput="UED.pass=this.value" placeholder="${ex?'بدون تغيير':'مثال: 482915'}">
   <label class="l">الصلاحية</label><select ${self?'disabled':''} onchange="uSet('role',this.value)">${ROLE_ORDER.map(r=>`<option value="${r}" ${r===U.role?'selected':''}>${ROLES[r]}</option>`).join('')}</select>
   <p class="small" style="margin:6px 0 0">${({admin:'كل الصلاحيات: الطلبة والحسابات والهيكل.',ba:'يشوف ويعدّل ويعتمد كل الدفعة، وكشوف المحجوزين.',gr:'يشوف ويعدّل ويعتمد الدورة (مثل الصمود)، وكشوف المحجوزين.',co:'يشوف ويعدّل ويعتمد سريته.',tr:'يدخل موجود فصيله ويرسله للاعتماد.',view:'يشوف العام والحالي والمتفرقة وينسخ ويصدّر PDF بس — ما يعدّل شي.'})[U.role]}</p>`;
-  if(U.role!=='admin'){h+=`<label class="l">${({tr:'الفصيل',co:'السرية',gr:'الدورة',ba:'الدفعة',view:'يشوف'})[U.role]}${multi?' (تقدر تختار أكثر من وحدة)':''}</label>`;
+  if(U.role!=='admin'){h+=`<label class="l">${({tr:'الفصيل',co:'السرية',gr:'الدورة',ba:'الدفعة',view:'يشوف'})[U.role]}${multi?' (تقدر تختار أكثر من وحدة)':' (وحدة فقط)'}</label>`;
     h+=ch.length?`<div class="card" style="margin:0;padding:6px 12px;max-height:240px;overflow:auto">${ch.map(o=>`<label class="chk" style="margin:6px 0"><input type="${multi?'checkbox':'radio'}" name="uSc" ${U.scope.includes(o.id)?'checked':''} onchange="${multi?`uTog('${o.id}',this.checked)`:`UED.scope=['${o.id}'];drawUser()`}"> ${esc(o.t)}</label>`).join('')}</div>`:`<p class="note bad">${U.role==='gr'?'أنشئ المجموعات (الصمود/التحرير) من الإعدادات أول':'لا توجد وحدات'}</p>`}
   h+=`<button class="btn full" style="margin-top:14px" id="uSave" onclick="saveUser()">${ex?'حفظ التعديل':'إنشاء الحساب'}</button>`;
   if(ex&&!self)h+=`<div class="row" style="margin-top:8px"><button class="btn sec" onclick="toggleUser()">${U.active?'⏸️ إيقاف الحساب':'▶️ تفعيل الحساب'}</button><button class="btn dng" onclick="delUser()">🗑️ حذف</button></div>`;
@@ -2195,7 +2195,12 @@ function fmForm(e){const o=REASONS.map(r=>`<option value="${r.k}" ${e&&e.k===r.k
   <label class="chk"><input id="fon" type="checkbox" ${on?'checked':''} onchange="document.getElementById('ft').disabled=this.checked"> لازالت مستمرة (بدون تاريخ نهاية)</label>
   <label class="l">السبب</label><input id="fc" type="text" value="${esc(e?e.cause:'')}" placeholder="مثال: عملية زائدة">
   <label class="l">ملاحظة</label><input id="fn" type="text" value="${esc(e?e.note:'')}" placeholder="اختياري">`}
-function fmEdit(i){const e=FML[i];if(!e)return;
+let FME=null;
+function fmKey(e){return {lid:e.l.id,reg:e.s.reg,src:e.src,k:e.k,since:e.since,end:e.end||null,ds:e.ds?[...e.ds]:null}}
+function fmFind(K){const l=IDX[K.lid]&&N(K.lid);const st=l&&l.students.find(x=>x.reg===K.reg);if(!st)return null;
+  if(K.src==='fx'){const fe=(st.fx||[]).find(x=>x.k===K.k&&x.since===K.since&&(x.end||null)===K.end);return fe?{l,s:st,src:'fx',e:fe,k:K.k,since:K.since,end:K.end}:null}
+  if(!K.ds.every(d=>l.days[d]&&l.days[d].abs&&l.days[d].abs[K.reg]===K.k))return null;return {l,s:st,src:'days',k:K.k,ds:[...K.ds],since:K.since,end:K.end}}
+function fmEdit(i){const e=FML[i];if(!e)return;FME=fmKey(e);
   form(`تعديل متفرقة — ${e.s.name}`,`<p class="small" style="margin:0 0 8px">${esc(e.s.reg)} — ${esc(unitTxt(e.l))}</p>${fmForm(e)}
     <div class="row" style="margin-top:12px"><button class="btn sec" onclick="closeConfirm();fmAddFor('${e.l.id}','${e.s.reg}')">📜 سجل الطالب / إضافة</button><button class="btn dng" onclick="fmDel(${i})">🗑️ حذف</button></div>`,()=>fmSave(i),'حفظ التعديل')}
 function fmRead(){const k=document.getElementById('fk').value,from=document.getElementById('ff').value,on=document.getElementById('fon').checked,to=document.getElementById('ft').value;
@@ -2205,11 +2210,11 @@ function fmRemove(e){if(e.src==='fx')e.s.fx.splice(e.s.fx.indexOf(e.e),1);else e
 function fmPut(l,s,x){const r=RMAP[x.k];
   if(!r.fx){let d=x.from;const last=x.on?today():x.to;while(d<=last){if(!l.days[d])l.days[d]={present:null,abs:{}};if(!l.days[d].abs)l.days[d].abs={};l.days[d].abs[s.reg]=x.k;d=addDays(d,1)}}
   else{s.fx=s.fx||[];s.fx.push({k:x.k,since:x.from,end:x.end,note:x.note,cause:x.cause,days:x.end?diffDays(x.from,x.end):null,due:null})}}
-function fmSave(i){const e=FML[i],x=fmRead();if(!x){document.getElementById('confirm').classList.add('on');return false}const {l,s}=e;
+function fmSave(i){const x=fmRead();if(!x){document.getElementById('confirm').classList.add('on');return false}const e=FME&&fmFind(FME);if(!e){toast('تغيّرت البيانات — افتح المتفرقة من جديد');renderFm();return}const {l,s}=e;
   const clash=stEpisodes(l,s).find(o=>!(o.src==='fx'&&e.src==='fx'&&o.e===e.e)&&!(o.src==='day'&&e.src==='days'&&e.ds.includes(o.d))&&o.since<(x.end||'9999')&&(o.end||'9999')>x.from);
   if(clash){showMsg('فيه تداخل',`الفترة تتداخل مع «${RMAP[clash.k].t}» من ${dm(clash.since)} ${clash.end?'إلى '+dm(clash.last):'(مستمرة)'}.\nعدّل التواريخ أو احذف الفترة الثانية أول.`);return false}
   if(x.from<FM.from)FM.from=x.from;const snap=absSnap(l,s);fmRemove(e);fmPut(l,s,x);fixPresent(l,s,snap);save();renderAll();renderFm();toast('✓ تم تعديل المتفرقة')}
-function fmDel(i){const e=FML[i];closeConfirm();setTimeout(()=>ask(`حذف «${RMAP[e.k].t}» لـ ${e.s.name} من ${dm(e.since)}؟`,()=>{const snap=absSnap(e.l,e.s);fmRemove(e);fixPresent(e.l,e.s,snap);save();renderAll();renderFm();toast('تم الحذف')}),60)}
+function fmDel(i){const e=FME&&fmFind(FME);closeConfirm();if(!e){toast('تغيّرت البيانات — افتح المتفرقة من جديد');renderFm();return}setTimeout(()=>ask(`حذف «${RMAP[e.k].t}» لـ ${e.s.name} من ${dm(e.since)}؟`,()=>{const snap=absSnap(e.l,e.s);fmRemove(e);fixPresent(e.l,e.s,snap);save();renderAll();renderFm();toast('تم الحذف')}),60)}
 {const _g2=go;go=function(v){if(v==='fxm'&&!isAdm())v='today';_g2(v);if(v==='fxm')renderFm()}}
 {const _ra=renderAll;renderAll=function(){_ra();try{if(view==='fxm')renderFm()}catch(e){console.error(e)}}}
 
