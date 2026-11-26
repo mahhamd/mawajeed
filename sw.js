@@ -1,5 +1,5 @@
 // غيّر رقم النسخة هنا مع كل تحديث (لازم يطابق APP_VERSION في index.html)
-const VERSION = '2.2.7';
+const VERSION = '2.2.8';
 const CACHE = 'mawajeed-' + VERSION;
 const FB_CACHE = 'mawajeed-fb-13.2.0';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
@@ -7,7 +7,8 @@ const FB = ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(
 
 self.addEventListener('install', e => {
   e.waitUntil(Promise.all([
-    caches.open(CACHE).then(c => c.addAll(FILES)),
+    // cache:'reload' = ينزّل الملفات من الموقع مباشرة (مو من الكاش القديم للمتصفح)
+    caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))),
     caches.open(FB_CACHE).then(c => Promise.all(FB.map(u => c.match(u).then(h => h || fetch(u, { mode: 'cors' }).then(r => r.ok && c.put(u, r)).catch(() => {})))))
   ]));
 });
@@ -26,6 +27,14 @@ self.addEventListener('fetch', e => {
   }
   if (u.origin !== location.origin) return; // اتصالات السيرفر ما نلمسها
   if (u.pathname.endsWith('/sw.js')) return;
+  // الصفحة نفسها: من النت أول (عشان التحديث يوصل)، وإذا ما فيه نت من الجهاز
+  if (req.mode === 'navigate' || u.pathname.endsWith('/index.html') || u.pathname.endsWith('/')) {
+    e.respondWith(fetch(req, { cache: 'no-store' }).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); }
+      return res;
+    }).catch(() => caches.match('./index.html').then(h => h || caches.match('./'))));
+    return;
+  }
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => hit ||
       fetch(req).then(res => {
